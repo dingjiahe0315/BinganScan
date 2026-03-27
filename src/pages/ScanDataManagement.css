@@ -1,0 +1,281 @@
+/**
+ * 病案扫描数据管理页面样式
+ */
+
+.scan-data-management {
+  min-height: 100vh;
+  background-color: #f0f2f5;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 顶部导航栏 */
+.top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  height: 64px;
+  background: linear-gradient(90deg, #1890ff 0%, #36cfc9 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.system-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+}
+
+.title-icon {
+  font-size: 24px;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-item {
+  padding: 0 16px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.nav-item-active {
+  color: white;
+  background-color: #f0f2f5;
+  font-weight: 500;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: white;
+  font-size: 14px;
+}
+
+.message-icon {
+  position: relative;
+  cursor: pointer;
+}
+
+.message-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background-color: #ff4d4f;
+  color: white;
+  font-size: 12px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 主内容区 */
+.main-content {
+  flex: 1;
+  padding: 24px;
+  margin: 0 16px 16px 16px;
+}
+
+/* 内容容器 - 将搜索区和表格区作为上下两行 */
+.content-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* 搜索行 */
+.search-row {
+  width: 100%;
+  margin-bottom: 0 !important;
+}
+
+/* 表格行 */
+.table-row {
+  width: 100%;
+  margin-top: 0 !important;
+}
+
+/* 搜索筛选区 */
+.search-section {
+  background-color: white;
+  padding: 24px;
+  border-radius: 4px;
+  margin-bottom: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* 第一行：搜索条件 */
+.search-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.search-inputs {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+}
+
+.search-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-label {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.85);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.search-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.search-actions {
+  flex-shrink: 0;
+}
+
+.scan-btn {
+  height: 40px !important;
+  padding: 0 24px !important;
+  font-weight: 500;
+}
+
+/* 标签页容器 */
+.tabs-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-item {
+  padding: 6px 16px;
+  font-size: 14px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-radius: 2px 2px 0 0;
+  background-color: #1890ff;
+  text-align: center;
+  min-width: 50px;
+}
+
+.tab-item:hover {
+  background-color: #40a9ff;
+}
+
+.tab-item.active {
+  background-color: #1890ff;
+  font-weight: 500;
+}
+
+/* 第三行：状态筛选 */
+.status-filters {
+  display: flex;
+  gap: 32px;
+  padding-top: 16px;
+  border-top: 1px solid #e8e8e8;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.filter-label {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.85);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 表格区 */
+.table-section {
+  background-color: white;
+  padding: 24px;
+  border-radius: 4px;
+  margin-top: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* 响应式 */
+@media (max-width: 1200px) {
+  .search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-inputs {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .search-actions {
+    text-align: right;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-header {
+    padding: 0 16px;
+  }
+  
+  .system-title {
+    font-size: 18px;
+  }
+  
+  .nav-menu {
+    display: none;
+  }
+  
+  .search-section {
+    padding: 16px;
+  }
+  
+  .search-buttons {
+    flex-direction: column;
+  }
+  
+  .search-actions {
+    text-align: left;
+  }
+  
+  .scan-btn {
+    width: 100%;
+  }
+  
+  .status-filters {
+    flex-direction: column;
+    gap: 16px;
+  }
+}

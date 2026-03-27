@@ -1,0 +1,371 @@
+/**
+ * 病案扫描页面样式文件
+ * 文件位置：src/pages/MedicalRecordScan.css
+ * 
+ * 样式结构：
+ * 1. 主容器样式
+ * 2. 顶部信息栏样式
+ * 3. 左侧导航栏样式
+ * 4. 文档预览区样式
+ * 5. 滚动条样式
+ * 6. 响应式设计
+ */
+
+/* ==================== 主容器样式 ==================== */
+.medical-record-scan {
+  min-height: 100vh;
+  background-color: #f0f2f5;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==================== 顶部信息栏样式 ==================== */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+}
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #1890ff;
+  margin: 0;
+  min-width: 100px;
+}
+
+.info-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-label {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.85);
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.select-all-checkbox {
+  margin-right: 8px;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+}
+
+.button-group .ant-btn {
+  height: 36px;
+  padding: 0 16px;
+}
+
+/* ==================== 主内容区样式 ==================== */
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* --- 左侧导航栏样式 --- */
+.left-sidebar {
+  width: 260px;
+  background-color: white;
+  border-right: 1px solid #e8e8e8;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.menu-container {
+  padding: 8px 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+}
+
+.menu-item:hover {
+  background-color: #e6f7ff;
+}
+
+.menu-item-selected {
+  background-color: #e6f7ff;
+  color: #1890ff;
+}
+
+.menu-item-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: #1890ff;
+}
+
+.menu-icon {
+  margin-right: 8px;
+  color: #666;
+  font-size: 16px;
+}
+
+.menu-item-selected .menu-icon {
+  color: #1890ff;
+}
+
+.menu-title {
+  flex: 1;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.menu-item-selected .menu-title {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.menu-arrow {
+  font-size: 10px;
+  color: #999;
+  transition: transform 0.3s;
+  margin-left: 4px;
+}
+
+.menu-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.menu-children {
+  background-color: #fafafa;
+}
+
+/* --- 文档预览区样式 --- */
+.document-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.document-header {
+  margin-bottom: 16px;
+}
+
+.current-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: #e6f7ff;
+  border: 1px solid #91d5ff;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.close-icon {
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.close-icon:hover {
+  color: #096dd9;
+}
+
+.document-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  overflow-y: auto;
+  padding-bottom: 16px;
+}
+
+.document-card {
+  background-color: white;
+  border: 2px solid #e8e8e8;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: all 0.3s;
+  cursor: pointer;
+  position: relative;
+}
+
+.document-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.document-card.selected {
+  border-color: #1890ff;
+  background-color: #e6f7ff;
+}
+
+.document-card.classified {
+  border-color: #1890ff;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.doc-checkbox {
+  pointer-events: auto;
+}
+
+.close-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #666;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.close-btn:hover {
+  background-color: #ff4d4f;
+  color: white;
+}
+
+.card-image {
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #fafafa;
+  min-height: 280px;
+}
+
+.card-image img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #e8e8e8;
+  border-radius: 2px;
+}
+
+.card-footer {
+  padding: 12px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.85);
+  background-color: white;
+  border-top: 1px solid #e8e8e8;
+  font-weight: 500;
+}
+
+.document-footer {
+  padding: 16px;
+  background-color: white;
+  border-top: 1px solid #e8e8e8;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.classified-count {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.unclassified-count {
+  color: #666;
+}
+
+/* ==================== 滚动条样式 ==================== */
+.left-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.left-sidebar::-webkit-scrollbar-track {
+  background-color: #f5f5f5;
+}
+
+.left-sidebar::-webkit-scrollbar-thumb {
+  background-color: #d9d9d9;
+  border-radius: 3px;
+}
+
+.left-sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: #bfbfbf;
+}
+
+.document-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.document-grid::-webkit-scrollbar-track {
+  background-color: #f0f0f0;
+  border-radius: 4px;
+}
+
+.document-grid::-webkit-scrollbar-thumb {
+  background-color: #bfbfbf;
+  border-radius: 4px;
+}
+
+.document-grid::-webkit-scrollbar-thumb:hover {
+  background-color: #999;
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 1400px) {
+  .document-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .top-bar-left {
+    flex-wrap: wrap;
+  }
+
+  .top-bar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
