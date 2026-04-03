@@ -1,53 +1,52 @@
 /**
- * 病案扫描页面样式文件
+ * 病案扫描页面样式文件（根据 UI 图调整）
  * 文件位置：src/pages/MedicalRecordScan.css
- * 
- * 样式结构：
- * 1. 主容器样式
- * 2. 顶部信息栏样式
- * 3. 左侧导航栏样式
- * 4. 文档预览区样式
- * 5. 滚动条样式
- * 6. 响应式设计
  */
 
 /* ==================== 主容器样式 ==================== */
 .medical-record-scan {
   min-height: 100vh;
-  background-color: #f0f2f5;
+  background-color: #f5f5f5;
   display: flex;
   flex-direction: column;
 }
 
-/* ==================== 顶部信息栏样式 ==================== */
-.top-bar {
+/* ==================== 顶部标题栏 ==================== */
+.title-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 8px 16px;
   background-color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  z-index: 100;
+  border-bottom: 1px solid #e8e8e8;
 }
 
-.top-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-
-.page-title {
-  font-size: 24px;
+.title-bar .page-title {
+  font-size: 18px;
   font-weight: bold;
   color: #1890ff;
   margin: 0;
-  min-width: 100px;
 }
 
-.info-group {
+.title-bar .close-btn {
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.title-bar .close-btn:hover {
+  color: #666;
+}
+
+/* ==================== 信息栏样式 ==================== */
+.info-bar {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  padding: 12px 16px;
+  background-color: #f0f7ff;
+  border-bottom: 1px solid #d6e4ff;
 }
 
 .info-label {
@@ -61,24 +60,28 @@
   color: rgba(0, 0, 0, 0.85);
 }
 
-.top-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.select-all-btn {
+  min-width: 80px;
 }
 
-.select-all-checkbox {
-  margin-right: 8px;
+.info-bar .ant-btn-primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
 }
 
-.button-group {
-  display: flex;
-  gap: 8px;
+.info-bar .ant-btn-primary:hover {
+  background-color: #40a9ff;
+  border-color: #40a9ff;
 }
 
-.button-group .ant-btn {
-  height: 36px;
-  padding: 0 16px;
+.info-bar .ant-btn-primary.ghost {
+  background-color: transparent;
+  color: #1890ff;
+}
+
+.info-bar .ant-btn-primary.ghost:hover {
+  color: #40a9ff;
+  border-color: #40a9ff;
 }
 
 /* ==================== 主内容区样式 ==================== */
@@ -90,79 +93,14 @@
 
 /* --- 左侧导航栏样式 --- */
 .left-sidebar {
-  width: 260px;
   background-color: white;
   border-right: 1px solid #e8e8e8;
   overflow-y: auto;
   flex-shrink: 0;
 }
 
-.menu-container {
-  padding: 8px 0;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: all 0.3s;
-  position: relative;
-}
-
-.menu-item:hover {
-  background-color: #e6f7ff;
-}
-
-.menu-item-selected {
-  background-color: #e6f7ff;
-  color: #1890ff;
-}
-
-.menu-item-selected::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background-color: #1890ff;
-}
-
-.menu-icon {
-  margin-right: 8px;
-  color: #666;
-  font-size: 16px;
-}
-
-.menu-item-selected .menu-icon {
-  color: #1890ff;
-}
-
-.menu-title {
-  flex: 1;
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.85);
-}
-
-.menu-item-selected .menu-title {
-  color: #1890ff;
-  font-weight: 500;
-}
-
-.menu-arrow {
-  font-size: 10px;
-  color: #999;
-  transition: transform 0.3s;
-  margin-left: 4px;
-}
-
-.menu-arrow.expanded {
-  transform: rotate(90deg);
-}
-
-.menu-children {
-  background-color: #fafafa;
+.left-sidebar .ant-menu {
+  border-right: none;
 }
 
 /* --- 文档预览区样式 --- */
@@ -171,11 +109,13 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 16px;
+  background-color: #f5f5f5;
 }
 
 .document-header {
-  margin-bottom: 16px;
+  padding: 12px 16px;
+  background-color: #f0f7ff;
+  border-bottom: 1px solid #d6e4ff;
 }
 
 .current-category {
@@ -183,31 +123,33 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background-color: #e6f7ff;
-  border: 1px solid #91d5ff;
+  background-color: white;
+  border: 1px solid #d6e4ff;
   border-radius: 4px;
   font-size: 14px;
   color: #1890ff;
   font-weight: 500;
+  border-bottom: 2px solid #1890ff;
 }
 
 .close-icon {
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
+  color: #999;
 }
 
 .close-icon:hover {
-  color: #096dd9;
+  color: #666;
 }
 
 .document-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
   overflow-y: auto;
-  padding-bottom: 16px;
+  padding: 16px;
 }
 
 .document-card {
@@ -218,11 +160,12 @@
   transition: all 0.3s;
   cursor: pointer;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .document-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
 }
 
 .document-card.selected {
@@ -238,53 +181,59 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  background-color: #fafafa;
-  border-bottom: 1px solid #e8e8e8;
+  padding: 4px 8px;
+  background-color: white;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
 }
 
 .doc-checkbox {
   pointer-events: auto;
 }
 
-.close-btn {
+.card-close-btn {
   width: 20px;
   height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background-color: rgba(0, 0, 0, 0.06);
+  background-color: white;
   color: #666;
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
   transition: all 0.3s;
+  border: 1px solid #e8e8e8;
 }
 
-.close-btn:hover {
+.card-close-btn:hover {
   background-color: #ff4d4f;
   color: white;
+  border-color: #ff4d4f;
 }
 
 .card-image {
-  padding: 12px;
+  padding: 32px 12px 12px;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #fafafa;
-  min-height: 280px;
+  background-color: #f0f7ff;
+  flex: 1;
+  min-height: 240px;
 }
 
 .card-image img {
   max-width: 100%;
   height: auto;
-  border: 1px solid #e8e8e8;
+  border: 1px solid #d6e4ff;
   border-radius: 2px;
 }
 
 .card-footer {
-  padding: 12px;
+  padding: 8px 12px;
   text-align: center;
   font-size: 14px;
   color: rgba(0, 0, 0, 0.85);
@@ -294,7 +243,7 @@
 }
 
 .document-footer {
-  padding: 16px;
+  padding: 12px 16px;
   background-color: white;
   border-top: 1px solid #e8e8e8;
   font-size: 14px;
@@ -349,23 +298,25 @@
 /* ==================== 响应式设计 ==================== */
 @media (max-width: 1400px) {
   .document-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 }
 
 @media (max-width: 1200px) {
-  .top-bar {
+  .info-bar {
+    padding: 12px;
+  }
+  
+  .info-bar .ant-row {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
   }
-
-  .top-bar-left {
-    flex-wrap: wrap;
-  }
-
-  .top-bar-right {
+  
+  .info-bar .ant-col {
     width: 100%;
-    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  
+  .info-bar .ant-col:last-child {
+    margin-bottom: 0;
   }
 }

@@ -10,13 +10,16 @@
  */
 import React, { useState } from 'react';
 import { 
+  Layout, 
+  Menu, 
   Checkbox, 
   Button, 
   Input, 
-  Tag, 
   message,
   Modal,
-  Tooltip
+  Row, 
+  Col,
+  Space
 } from 'antd';
 import { 
   FolderOutlined, 
@@ -27,119 +30,122 @@ import {
   ScanOutlined,
   RotateLeftOutlined,
   SaveOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  RightOutlined,
+  DownOutlined
 } from '@ant-design/icons';
 import './MedicalRecordScan.css';
 
 const { Search } = Input;
+const { Header, Content, Sider } = Layout;
 
 /**
- * 左侧导航菜单数据结构
- * 包含所有病案文档分类，支持多级嵌套
+ * 左侧导航菜单数据结构（为Ant Design Menu准备）
  */
-// 模拟左侧导航菜单数据
-const menuData = [
+const menuItems = [
   {
     key: 'overview',
-    title: '总览',
-    icon: <FolderOutlined />,
-    children: []
+    label: '总览',
+    icon: <FolderOutlined />
   },
   {
     key: 'record-home',
-    title: '病案首页',
-    icon: <FileTextOutlined />,
-    children: []
+    label: '病案首页',
+    icon: <FileTextOutlined />
   },
   {
     key: 'admission-record',
-    title: '入院记录',
-    icon: <FileTextOutlined />,
-    children: []
+    label: '入院记录',
+    icon: <FileTextOutlined />
   },
   {
     key: 'discharge-related',
-    title: '出院相关记录',
+    label: '出院相关记录',
     icon: <FolderOutlined />,
     children: [
-      { key: 'discharge-death', title: '出院（死亡）记录', icon: <FilePdfOutlined /> },
-      { key: 'health-education', title: '患者健康教育处方', icon: <FilePdfOutlined /> },
-      { key: 'discharge-certificate', title: '出院医疗证明', icon: <FilePdfOutlined /> }
+      { 
+        key: 'discharge-death', 
+        label: '出院（死亡）记录', 
+        icon: <FilePdfOutlined /> 
+      },
+      { 
+        key: 'health-education', 
+        label: '患者健康教育处方', 
+        icon: <FilePdfOutlined /> 
+      },
+      { 
+        key: 'discharge-certificate', 
+        label: '出院医疗证明', 
+        icon: <FilePdfOutlined /> 
+      }
     ]
   },
   {
     key: 'progress-note',
-    title: '病程记录',
+    label: '病程记录',
     icon: <FolderOutlined />,
     children: [
-      { key: 'discharge-discussion', title: '出院（死亡）讨论', icon: <FilePdfOutlined /> }
+      { 
+        key: 'discharge-discussion', 
+        label: '出院（死亡）讨论', 
+        icon: <FilePdfOutlined /> 
+      }
     ]
   },
   {
     key: 'consultation-record',
-    title: '知情谈话记录',
-    icon: <FolderOutlined />,
-    children: []
+    label: '知情谈话记录',
+    icon: <FolderOutlined />
   },
   {
     key: 'surgery-related',
-    title: '手术相关记录与资料',
-    icon: <FolderOutlined />,
-    children: []
+    label: '手术相关记录与资料',
+    icon: <FolderOutlined />
   },
   {
     key: 'approval-sheet',
-    title: '审批单',
-    icon: <FolderOutlined />,
-    children: []
+    label: '审批单',
+    icon: <FolderOutlined />
   },
   {
     key: 'consultation-sheet',
-    title: '会诊单',
-    icon: <FolderOutlined />,
-    children: []
+    label: '会诊单',
+    icon: <FolderOutlined />
   },
   {
     key: 'specialist-assessment',
-    title: '专科评估记录单',
-    icon: <FolderOutlined />,
-    children: []
+    label: '专科评估记录单',
+    icon: <FolderOutlined />
   },
   {
     key: 'difficult-case',
-    title: '疑难病历讨论',
-    icon: <FolderOutlined />,
-    children: []
+    label: '疑难病历讨论',
+    icon: <FolderOutlined />
   },
   {
     key: 'lab-report',
-    title: '检查检验报告',
-    icon: <FolderOutlined />,
-    children: []
+    label: '检查检验报告',
+    icon: <FolderOutlined />
   },
   {
     key: 'temperature-sheet',
-    title: '体温单',
-    icon: <FolderOutlined />,
-    children: []
+    label: '体温单',
+    icon: <FolderOutlined />
   },
   {
     key: 'doctor-order',
-    title: '医嘱单',
-    icon: <FolderOutlined />,
-    children: []
+    label: '医嘱单',
+    icon: <FolderOutlined />
   },
   {
     key: 'nursing-record',
-    title: '护理记录',
-    icon: <FolderOutlined />,
-    children: []
+    label: '护理记录',
+    icon: <FolderOutlined />
   },
   {
     key: 'other-related',
-    title: '其他相关资料',
-    icon: <FolderOutlined />,
-    children: []
+    label: '其他相关资料',
+    icon: <FolderOutlined />
   }
 ];
 
@@ -147,7 +153,6 @@ const menuData = [
  * 生成模拟文档数据
  * @returns {Array} 文档数组，包含文档分类、图片、选择状态等
  */
-// 模拟文档数据
 const generateMockDocuments = () => {
   const docs = [];
   const categories = ['病案首页', '入院记录', '首次病程'];
@@ -185,28 +190,21 @@ function MedicalRecordScan() {
   // ========== 事件处理函数 ==========
   
   /**
-   * 切换菜单展开/收起状态
-   * @param {string} menuKey - 菜单项的 key
+   * 菜单展开/收起处理
    */
-  const toggleMenuExpand = (menuKey) => {
-    setExpandedMenus(prev => 
-      prev.includes(menuKey) 
-        ? prev.filter(key => key !== menuKey)
-        : [...prev, menuKey]
-    );
+  const handleMenuOpenChange = (keys) => {
+    setExpandedMenus(keys);
   };
 
   /**
    * 菜单项点击处理
-   * @param {string} menuKey - 菜单项的 key
    */
-  const handleMenuClick = (menuKey) => {
-    setSelectedMenu(menuKey);
+  const handleMenuClick = ({ key }) => {
+    setSelectedMenu(key);
   };
 
   /**
    * 全选/取消全选处理
-   * @param {Event} e - 复选框变化事件
    */
   const handleSelectAll = (e) => {
     const checked = e.target.checked;
@@ -219,7 +217,6 @@ function MedicalRecordScan() {
 
   /**
    * 选择/取消选择单个文档
-   * @param {number} docKey - 文档的 key
    */
   const handleSelectDocument = (docKey) => {
     setDocuments(docs => docs.map(doc => 
@@ -231,7 +228,6 @@ function MedicalRecordScan() {
 
   /**
    * 删除文档
-   * @param {number} docKey - 文档的 key
    */
   const handleDeleteDocument = (docKey) => {
     setDocuments(docs => docs.filter(doc => doc.key !== docKey));
@@ -240,7 +236,6 @@ function MedicalRecordScan() {
 
   /**
    * 开始扫描操作
-   * 校验是否选择文档，显示扫描提示
    */
   const handleStartScan = () => {
     if (selectedCount === 0) {
@@ -252,7 +247,6 @@ function MedicalRecordScan() {
 
   /**
    * 插入页面操作
-   * 用于在现有文档中插入新页面
    */
   const handleInsertPage = () => {
     message.info('插入页面功能');
@@ -260,7 +254,6 @@ function MedicalRecordScan() {
 
   /**
    * 替扫操作
-   * 重新扫描已有文档
    */
   const handleRescan = () => {
     message.info('替扫功能');
@@ -268,7 +261,6 @@ function MedicalRecordScan() {
 
   /**
    * 扫描暂存操作
-   * 保存当前扫描进度
    */
   const handleSaveTemp = () => {
     message.success('扫描暂存成功');
@@ -276,7 +268,6 @@ function MedicalRecordScan() {
 
   /**
    * 扫描完成操作
-   * 弹出确认框，确认后完成扫描
    */
   const handleScanComplete = () => {
     Modal.confirm({
@@ -288,159 +279,125 @@ function MedicalRecordScan() {
     });
   };
 
-  // ========== 渲染辅助函数 ==========
-  
-  /**
-   * 渲染菜单图标
-   * @param {ReactNode} icon - 图标组件
-   * @param {boolean} hasChildren - 是否有子菜单
-   * @returns {ReactNode} 渲染的图标
-   */
-  const renderMenuIcon = (icon, hasChildren) => {
-    if (hasChildren) {
-      return icon;
-    }
-    return <span style={{ marginLeft: 20 }}>{icon}</span>;
-  };
-
-  /**
-   * 递归渲染菜单项
-   * @param {Object} item - 菜单项数据
-   * @param {number} level - 菜单层级（用于缩进）
-   * @returns {ReactNode} 渲染的菜单项
-   */
-  const renderMenuItem = (item, level = 0) => {
-    const hasChildren = item.children && item.children.length > 0; // 判断是否有子菜单
-    const isExpanded = expandedMenus.includes(item.key); // 判断是否展开
-    const isSelected = selectedMenu === item.key; // 判断是否选中
-
-    return (
-      <div key={item.key}>
-        <div 
-          className={`menu-item ${isSelected ? 'menu-item-selected' : ''}`}
-          style={{ paddingLeft: `${level * 16 + 12}px` }}
-          onClick={() => {
-            if (hasChildren) {
-              toggleMenuExpand(item.key); // 有子菜单时切换展开状态
-            } else {
-              handleMenuClick(item.key); // 无子菜单时选中该项
-            }
-          }}
-        >
-          <span className="menu-icon">
-            {renderMenuIcon(item.icon, hasChildren)}
-          </span>
-          <span className="menu-title">{item.title}</span>
-          {hasChildren && (
-            <span className={`menu-arrow ${isExpanded ? 'expanded' : ''}`}>
-              ▶
-            </span>
-          )}
-        </div>
-        {hasChildren && isExpanded && (
-          <div className="menu-children">
-            {item.children.map(child => renderMenuItem(child, level + 1))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   // ========== JSX 渲染 ==========
   return (
-    <div className="medical-record-scan">
-      {/* ==================== 顶部信息栏 ==================== */}
-      {/* 包含：页面标题、病案条码输入、病人信息、操作按钮组 */}
-      <div className="top-bar">
-        <div className="top-bar-left">
-          <h1 className="page-title">病案扫描</h1>
-          {/* 病案条码输入框 - 支持扫码枪或手工输入 */}
-          <div className="info-group">
-            <label>病案条码：</label>
-            <Search
-              placeholder="扫码枪或者手工调入"
-              value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              style={{ width: 200 }}
-              allowClear
-            />
-          </div>
-          {/* 病人基本信息展示 */}
-          <div className="info-group">
-            <span className="info-label">病人姓名：</span>
-            <span className="info-value">李二二</span>
-          </div>
-          <div className="info-group">
-            <span className="info-label">住院次：</span>
-            <span className="info-value">第 2 次住院</span>
-          </div>
-          <div className="info-group">
-            <span className="info-label">出院科室：</span>
-            <span className="info-value">消化内科</span>
-          </div>
-          <div className="info-group">
-            <span className="info-label">出院日期：</span>
-            <span className="info-value">2024-08-09</span>
-          </div>
-        </div>
-        <div className="top-bar-right">
-          {/* 全选复选框 */}
-          <Checkbox 
-            checked={selectAll}
-            onChange={handleSelectAll}
-            className="select-all-checkbox"
-          >
-            全选
-          </Checkbox>
-          {/* 删除按钮 - 未选中时禁用 */}
-          <Button 
-            danger 
-            icon={<DeleteOutlined />}
-            disabled={selectedCount === 0}
-          >
-            删除
-          </Button>
-          {/* 主要操作按钮组 */}
-          <div className="button-group">
-            <Button 
-              type="primary" 
-              icon={<ScanOutlined />}
-              onClick={handleStartScan}
-            >
-              开始扫描
-            </Button>
-            <Button icon={<PlusOutlined />} onClick={handleInsertPage}>
-              插描
-            </Button>
-            <Button icon={<RotateLeftOutlined />} onClick={handleRescan}>
-              替扫
-            </Button>
-            <Button icon={<SaveOutlined />} onClick={handleSaveTemp}>
-              扫描暂存
-            </Button>
-            <Button 
-              type="primary" 
-              icon={<CheckCircleOutlined />}
-              onClick={handleScanComplete}
-            >
-              扫描完成
-            </Button>
-          </div>
-        </div>
+    <Layout className="medical-record-scan">
+      {/* ==================== 顶部标题栏 ==================== */}
+      <div className="title-bar">
+        <h1 className="page-title">病案扫描</h1>
+        <span className="close-btn">×</span>
+      </div>
+      
+      {/* ==================== 信息栏 ==================== */}
+      <div className="info-bar">
+        <Row align="middle" justify="space-between" style={{ width: '100%' }}>
+          <Col>
+            <Space size="middle">
+              {/* 病案条码输入框 */}
+              <Space size="small">
+                <span className="info-label">病案条码：</span>
+                <Search
+                  placeholder="扫码枪或者手工调入"
+                  value={barcode}
+                  onChange={(e) => setBarcode(e.target.value)}
+                  style={{ width: 180 }}
+                  allowClear
+                />
+              </Space>
+              {/* 病人基本信息 */}
+              <Space size="small">
+                <span className="info-label">病人姓名：</span>
+                <span className="info-value">李二二</span>
+              </Space>
+              <Space size="small">
+                <span className="info-label">住院次：</span>
+                <span className="info-value">第2次住院</span>
+              </Space>
+              <Space size="small">
+                <span className="info-label">出院科室：</span>
+                <span className="info-value">消化内科</span>
+              </Space>
+              <Space size="small">
+                <span className="info-label">出院日期：</span>
+                <span className="info-value">2024-08-09</span>
+              </Space>
+            </Space>
+          </Col>
+          <Col>
+            <Space size="middle" align="center">
+              {/* 全选复选框 */}
+              <Button 
+                type="primary"
+                ghost
+                onClick={handleSelectAll}
+                className="select-all-btn"
+              >
+                全选
+              </Button>
+              {/* 删除按钮 */}
+              <Button 
+                type="primary"
+                ghost
+                disabled={selectedCount === 0}
+              >
+                删除
+              </Button>
+              {/* 主要操作按钮组 */}
+              <Space size="small">
+                <Button 
+                  type="primary" 
+                  onClick={handleStartScan}
+                >
+                  开始扫描
+                </Button>
+                <Button 
+                  type="primary" 
+                  onClick={handleInsertPage}
+                >
+                  插描
+                </Button>
+                <Button 
+                  type="primary" 
+                  onClick={handleRescan}
+                >
+                  替扫
+                </Button>
+                <Button 
+                  type="primary" 
+                  onClick={handleSaveTemp}
+                >
+                  扫描暂存
+                </Button>
+                <Button 
+                  type="primary" 
+                  onClick={handleScanComplete}
+                >
+                  扫描完成
+                </Button>
+              </Space>
+            </Space>
+          </Col>
+        </Row>
       </div>
 
       {/* ==================== 主内容区 ==================== */}
-      <div className="main-content">
-        {/* 左侧导航栏 - 病案分类树形菜单 */}
-        <div className="left-sidebar">
-          <div className="menu-container">
-            {menuData.map(item => renderMenuItem(item))}
-          </div>
-        </div>
+      <Layout className="main-content">
+        {/* 左侧导航栏 */}
+        <Sider width={260} className="left-sidebar">
+          <Menu
+            mode="inline"
+            selectedKeys={[selectedMenu]}
+            openKeys={expandedMenus}
+            onOpenChange={handleMenuOpenChange}
+            onClick={handleMenuClick}
+            items={menuItems}
+            expandIcon={({ isOpen }) => isOpen ? <DownOutlined /> : <RightOutlined />}
+          />
+        </Sider>
 
-        {/* 右侧文档预览区 - 文档缩略图网格 */}
-        <div className="document-area">
-          {/* 文档区域头部 - 显示当前分类 */}
+        {/* 右侧文档预览区 */}
+        <Content className="document-area">
+          {/* 文档区域头部 */}
           <div className="document-header">
             <div className="current-category">
               总览
@@ -448,22 +405,26 @@ function MedicalRecordScan() {
             </div>
           </div>
           
-          {/* 文档网格 - 展示所有文档缩略图 */}
+          {/* 文档网格 */}
           <div className="document-grid">
             {documents.map(doc => (
               <div 
                 key={doc.key}
                 className={`document-card ${doc.isSelected ? 'selected' : ''} ${doc.isClassified ? 'classified' : ''}`}
+                onClick={() => handleSelectDocument(doc.key)}
               >
-                {/* 文档卡片头部 - 复选框和删除按钮 */}
+                {/* 文档卡片头部 */}
                 <div className="card-header">
                   <Checkbox
                     checked={doc.isSelected}
-                    onChange={() => handleSelectDocument(doc.key)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleSelectDocument(doc.key);
+                    }}
                     className="doc-checkbox"
                   />
                   <span 
-                    className="close-btn"
+                    className="card-close-btn"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteDocument(doc.key);
@@ -484,15 +445,17 @@ function MedicalRecordScan() {
             ))}
           </div>
 
-          {/* 文档区域底部 - 统计信息 */}
+          {/* 文档区域底部 */}
           <div className="document-footer">
-            <span>共：{documents.length}页，</span>
-            <span className="classified-count">已分类{classifiedCount}页（蓝色边框），</span>
-            <span className="unclassified-count">未分类{unclassifiedCount}页</span>
+            <Space size="small">
+              <span>共：{documents.length}页，</span>
+              <span className="classified-count">已分类{classifiedCount}页（蓝色边框），</span>
+              <span className="unclassified-count">未分类{unclassifiedCount}页</span>
+            </Space>
           </div>
-        </div>
-      </div>
-    </div>
+        </Content>
+      </Layout>
+    </Layout>
   );
 }
 
