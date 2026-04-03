@@ -84,6 +84,17 @@
   border-color: #40a9ff;
 }
 
+/* ==================== 扫描进度条样式 ==================== */
+.scan-progress-bar {
+  padding: 12px 24px;
+  background-color: white;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.scan-progress-bar .ant-progress {
+  max-width: 600px;
+}
+
 /* ==================== 主内容区样式 ==================== */
 .main-content {
   display: flex;
@@ -223,6 +234,17 @@
   background-color: #f0f7ff;
   flex: 1;
   min-height: 240px;
+  cursor: zoom-in;
+  transition: all 0.3s;
+}
+
+.card-image:hover {
+  background-color: #d6e4ff;
+}
+
+.card-image:hover img {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .card-image img {
@@ -230,6 +252,7 @@
   height: auto;
   border: 1px solid #d6e4ff;
   border-radius: 2px;
+  transition: all 0.3s;
 }
 
 .card-footer {

@@ -1,13 +1,3 @@
-/**
- * 病案扫描页面组件
- * 文件位置：src/pages/MedicalRecordScan.jsx
- * 功能：病案扫描管理，包括文档预览、分类、扫描操作等
- * 
- * 主要功能模块：
- * 1. 顶部信息栏 - 显示病人信息、条码输入、操作按钮
- * 2. 左侧导航菜单 - 病案分类树形菜单
- * 3. 文档预览区 - 文档缩略图网格展示
- */
 import React, { useState } from 'react';
 import { 
   Layout, 
@@ -19,29 +9,23 @@ import {
   Modal,
   Row, 
   Col,
-  Space
+  Space,
+  Progress,
+  Image
 } from 'antd';
 import { 
   FolderOutlined, 
   FileTextOutlined, 
   FilePdfOutlined,
-  PlusOutlined,
-  DeleteOutlined,
-  ScanOutlined,
-  RotateLeftOutlined,
-  SaveOutlined,
-  CheckCircleOutlined,
   RightOutlined,
   DownOutlined
 } from '@ant-design/icons';
 import './MedicalRecordScan.css';
+import * as UTIF from 'utif';
 
 const { Search } = Input;
-const { Header, Content, Sider } = Layout;
+const { Content, Sider } = Layout;
 
-/**
- * 左侧导航菜单数据结构（为Ant Design Menu准备）
- */
 const menuItems = [
   {
     key: 'overview',
@@ -149,63 +133,77 @@ const menuItems = [
   }
 ];
 
-/**
- * 生成模拟文档数据
- * @returns {Array} 文档数组，包含文档分类、图片、选择状态等
- */
-const generateMockDocuments = () => {
-  const docs = [];
-  const categories = ['病案首页', '入院记录', '首次病程'];
-  
-  for (let i = 0; i < 32; i++) {
-    const category = categories[i % categories.length];
-    docs.push({
-      key: i,
-      category: category,
-      image: `https://via.placeholder.com/200x280?text=${category}-${i + 1}`,
-      isSelected: i < 15,
-      isClassified: i < 15
-    });
+const tifFileNames = [
+  '1.tiff', '2.tiff', '3.tiff', '4.tiff', '5.tiff',
+  '6.tiff', '7.tiff', '8.tiff', '9.tiff', '10.tiff',
+  '11.tiff', '12.tiff', '13.tiff', '14.tiff', '15.tiff',
+  '16.tiff', 'blue-tiff-jpeg-comp.tif', 'blue-tiff-no-comp.tif',
+  'blue-tiff-zip-comp.tif', 'Space02-Default.tiff'
+];
+
+const loadTifImage = async (filePath) => {
+  try {
+    const response = await fetch(filePath);
+    const arrayBuffer = await response.arrayBuffer();
+    
+    const ifds = UTIF.decode(arrayBuffer);
+    
+    if (ifds && ifds.length > 0) {
+      const ifd = ifds[0];
+      UTIF.decodeImage(arrayBuffer, ifd);
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = ifd.width;
+      canvas.height = ifd.height;
+      const ctx = canvas.getContext('2d');
+      
+      const rgba = UTIF.toRGBA8(ifd);
+      const imageData = ctx.createImageData(ifd.width, ifd.height);
+      imageData.data.set(rgba);
+      ctx.putImageData(imageData, 0, 0);
+      
+      const resizeCanvas = document.createElement('canvas');
+      const maxWidth = 400;
+      const maxHeight = 560;
+      let ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height, 1);
+      resizeCanvas.width = Math.floor(canvas.width * ratio);
+      resizeCanvas.height = Math.floor(canvas.height * ratio);
+      
+      const resizeCtx = resizeCanvas.getContext('2d');
+      resizeCtx.drawImage(canvas, 0, 0, resizeCanvas.width, resizeCanvas.height);
+      
+      return resizeCanvas.toDataURL('image/jpeg', 0.85);
+    }
+    
+    throw new Error('无法解析 TIF 文件');
+  } catch (error) {
+    console.error('加载 TIF 图片失败:', error);
+    return `https://via.placeholder.com/400x560?text=TIF-Image`;
   }
-  
-  return docs;
 };
 
-/**
- * 病案扫描主组件
- */
 function MedicalRecordScan() {
-  // ========== State 状态管理 ==========
-  const [barcode, setBarcode] = useState(''); // 病案条码
-  const [selectedMenu, setSelectedMenu] = useState('overview'); // 当前选中的菜单项
-  const [expandedMenus, setExpandedMenus] = useState(['discharge-related', 'progress-note']); // 展开的菜单项
-  const [documents, setDocuments] = useState(generateMockDocuments()); // 文档列表
-  const [selectAll, setSelectAll] = useState(false); // 全选状态
+  const [barcode, setBarcode] = useState('');
+  const [selectedMenu, setSelectedMenu] = useState('overview');
+  const [expandedMenus, setExpandedMenus] = useState(['discharge-related', 'progress-note']);
+  const [documents, setDocuments] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [previewImage, setPreviewImage] = useState(null);
 
-  // ========== 计算属性 ==========
-  const selectedCount = documents.filter(doc => doc.isSelected).length; // 已选中文档数
-  const classifiedCount = documents.filter(doc => doc.isClassified).length; // 已分类文档数
-  const unclassifiedCount = documents.length - classifiedCount; // 未分类文档数
+  const selectedCount = documents.filter(doc => doc.isSelected).length;
+  const classifiedCount = documents.filter(doc => doc.isClassified).length;
+  const unclassifiedCount = documents.length - classifiedCount;
 
-  // ========== 事件处理函数 ==========
-  
-  /**
-   * 菜单展开/收起处理
-   */
   const handleMenuOpenChange = (keys) => {
     setExpandedMenus(keys);
   };
 
-  /**
-   * 菜单项点击处理
-   */
   const handleMenuClick = ({ key }) => {
     setSelectedMenu(key);
   };
 
-  /**
-   * 全选/取消全选处理
-   */
   const handleSelectAll = (e) => {
     const checked = e.target.checked;
     setSelectAll(checked);
@@ -215,9 +213,6 @@ function MedicalRecordScan() {
     })));
   };
 
-  /**
-   * 选择/取消选择单个文档
-   */
   const handleSelectDocument = (docKey) => {
     setDocuments(docs => docs.map(doc => 
       doc.key === docKey 
@@ -226,49 +221,65 @@ function MedicalRecordScan() {
     ));
   };
 
-  /**
-   * 删除文档
-   */
   const handleDeleteDocument = (docKey) => {
     setDocuments(docs => docs.filter(doc => doc.key !== docKey));
     message.success('删除成功');
   };
 
-  /**
-   * 开始扫描操作
-   */
-  const handleStartScan = () => {
-    if (selectedCount === 0) {
-      message.warning('请先选择要扫描的文档');
+  const handleStartScan = async () => {
+    if (isScanning) {
+      message.warning('正在扫描中，请稍候...');
       return;
     }
-    message.success(`开始扫描 ${selectedCount} 个文档`);
+
+    setIsScanning(true);
+    setScanProgress(0);
+    message.info('开始扫描...');
+
+    const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
+    
+    for (let i = 0; i < tifFileNames.length; i++) {
+      const fileName = tifFileNames[i];
+      const filePath = `/sample-tiffs/${fileName}`;
+      const category = categories[i % categories.length];
+      
+      const imageUrl = await loadTifImage(filePath);
+      
+      setDocuments(prevDocs => [
+        ...prevDocs,
+        {
+          key: `tif-${i}`,
+          category: category,
+          image: imageUrl,
+          fullImage: imageUrl,
+          fileName: fileName,
+          isSelected: false,
+          isClassified: false
+        }
+      ]);
+      
+      setScanProgress(Math.round(((i + 1) / tifFileNames.length) * 100));
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
+    setTimeout(() => {
+      setIsScanning(false);
+      message.success(`扫描完成！共加载 ${tifFileNames.length} 张图片`);
+    }, 500);
   };
 
-  /**
-   * 插入页面操作
-   */
   const handleInsertPage = () => {
     message.info('插入页面功能');
   };
 
-  /**
-   * 替扫操作
-   */
   const handleRescan = () => {
     message.info('替扫功能');
   };
 
-  /**
-   * 扫描暂存操作
-   */
   const handleSaveTemp = () => {
     message.success('扫描暂存成功');
   };
 
-  /**
-   * 扫描完成操作
-   */
   const handleScanComplete = () => {
     Modal.confirm({
       title: '确认完成扫描？',
@@ -279,21 +290,17 @@ function MedicalRecordScan() {
     });
   };
 
-  // ========== JSX 渲染 ==========
   return (
     <Layout className="medical-record-scan">
-      {/* ==================== 顶部标题栏 ==================== */}
       <div className="title-bar">
         <h1 className="page-title">病案扫描</h1>
         <span className="close-btn">×</span>
       </div>
       
-      {/* ==================== 信息栏 ==================== */}
       <div className="info-bar">
         <Row align="middle" justify="space-between" style={{ width: '100%' }}>
           <Col>
             <Space size="middle">
-              {/* 病案条码输入框 */}
               <Space size="small">
                 <span className="info-label">病案条码：</span>
                 <Search
@@ -304,7 +311,6 @@ function MedicalRecordScan() {
                   allowClear
                 />
               </Space>
-              {/* 病人基本信息 */}
               <Space size="small">
                 <span className="info-label">病人姓名：</span>
                 <span className="info-value">李二二</span>
@@ -325,7 +331,6 @@ function MedicalRecordScan() {
           </Col>
           <Col>
             <Space size="middle" align="center">
-              {/* 全选复选框 */}
               <Button 
                 type="primary"
                 ghost
@@ -334,7 +339,6 @@ function MedicalRecordScan() {
               >
                 全选
               </Button>
-              {/* 删除按钮 */}
               <Button 
                 type="primary"
                 ghost
@@ -342,7 +346,6 @@ function MedicalRecordScan() {
               >
                 删除
               </Button>
-              {/* 主要操作按钮组 */}
               <Space size="small">
                 <Button 
                   type="primary" 
@@ -380,9 +383,18 @@ function MedicalRecordScan() {
         </Row>
       </div>
 
-      {/* ==================== 主内容区 ==================== */}
+      {isScanning && (
+        <div className="scan-progress-bar">
+          <Progress 
+            percent={scanProgress} 
+            status="active"
+            showInfo={true}
+            format={(percent) => `扫描中... ${percent}%`}
+          />
+        </div>
+      )}
+
       <Layout className="main-content">
-        {/* 左侧导航栏 */}
         <Sider width={260} className="left-sidebar">
           <Menu
             mode="inline"
@@ -395,9 +407,7 @@ function MedicalRecordScan() {
           />
         </Sider>
 
-        {/* 右侧文档预览区 */}
         <Content className="document-area">
-          {/* 文档区域头部 */}
           <div className="document-header">
             <div className="current-category">
               总览
@@ -405,15 +415,12 @@ function MedicalRecordScan() {
             </div>
           </div>
           
-          {/* 文档网格 */}
           <div className="document-grid">
             {documents.map(doc => (
               <div 
                 key={doc.key}
                 className={`document-card ${doc.isSelected ? 'selected' : ''} ${doc.isClassified ? 'classified' : ''}`}
-                onClick={() => handleSelectDocument(doc.key)}
               >
-                {/* 文档卡片头部 */}
                 <div className="card-header">
                   <Checkbox
                     checked={doc.isSelected}
@@ -433,19 +440,23 @@ function MedicalRecordScan() {
                     ×
                   </span>
                 </div>
-                {/* 文档缩略图 */}
-                <div className="card-image">
-                  <img src={doc.image} alt={doc.category} />
+                <div 
+                  className="card-image"
+                  onClick={() => {
+                    if (doc.fullImage) {
+                      setPreviewImage(doc.fullImage);
+                    }
+                  }}
+                >
+                  <img src={doc.image} alt={doc.category} loading="lazy" />
                 </div>
-                {/* 文档分类标签 */}
                 <div className="card-footer">
-                  {doc.category}
+                  {doc.fileName ? doc.fileName : doc.category}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* 文档区域底部 */}
           <div className="document-footer">
             <Space size="small">
               <span>共：{documents.length}页，</span>
@@ -455,6 +466,19 @@ function MedicalRecordScan() {
           </div>
         </Content>
       </Layout>
+
+      {previewImage && (
+        <Image.PreviewGroup
+          preview={{
+            visible: !!previewImage,
+            onVisibleChange: (visible) => {
+              if (!visible) setPreviewImage(null);
+            },
+          }}
+        >
+          <Image src={previewImage} style={{ display: 'none' }} />
+        </Image.PreviewGroup>
+      )}
     </Layout>
   );
 }
