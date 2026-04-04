@@ -178,7 +178,7 @@ const loadTifImage = async (filePath) => {
     throw new Error('无法解析 TIF 文件');
   } catch (error) {
     console.error('加载 TIF 图片失败:', error);
-    return `https://via.placeholder.com/400x560?text=TIF-Image`;
+    return null;
   }
 };
 
@@ -448,7 +448,11 @@ function MedicalRecordScan() {
                     }
                   }}
                 >
-                  <img src={doc.image} alt={doc.category} loading="lazy" />
+                  {doc.image ? (
+                    <img src={doc.image} alt={doc.category} loading="lazy" />
+                  ) : (
+                    <div className="load-failed">加载失败</div>
+                  )}
                 </div>
                 <div className="card-footer">
                   {doc.fileName ? doc.fileName : doc.category}
