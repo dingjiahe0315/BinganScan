@@ -268,12 +268,86 @@ function MedicalRecordScan() {
     }, 500);
   };
 
-  const handleInsertPage = () => {
-    message.info('插入页面功能');
+  const handleInsertPage = async () => {
+    const selectedDocs = documents.filter(doc => doc.isSelected);
+    if (selectedDocs.length === 0) {
+      message.warning('请先选择要在其后插入的图片');
+      return;
+    }
+
+    try {
+      const filePath = `/sample-tiffs/1.tiff`;
+      const imageUrl = await loadTifImage(filePath);
+      
+      if (!imageUrl) {
+        message.error('加载 1.tiff 失败');
+        return;
+      }
+
+      const newDocument = {
+        key: `tif-insert-${Date.now()}`,
+        category: '插入页面',
+        image: imageUrl,
+        fullImage: imageUrl,
+        fileName: '1.tiff',
+        isSelected: false,
+        isClassified: false
+      };
+
+      const newDocuments = [...documents];
+      selectedDocs.forEach(doc => {
+        const index = newDocuments.findIndex(d => d.key === doc.key);
+        if (index !== -1) {
+          newDocuments.splice(index + 1, 0, { ...newDocument, key: `tif-insert-${Date.now()}-${index}` });
+        }
+      });
+
+      setDocuments(newDocuments);
+      message.success(`成功插入 ${selectedDocs.length} 张图片`);
+    } catch (error) {
+      console.error('插描失败:', error);
+      message.error('插描失败');
+    }
   };
 
-  const handleRescan = () => {
-    message.info('替扫功能');
+  const handleRescan = async () => {
+    const selectedDocs = documents.filter(doc => doc.isSelected);
+    if (selectedDocs.length === 0) {
+      message.warning('请先选择要替换的图片');
+      return;
+    }
+    if (selectedDocs.length > 1) {
+      message.warning('只能选择一张图片进行替扫');
+      return;
+    }
+
+    try {
+      const filePath = `/sample-tiffs/1.tiff`;
+      const imageUrl = await loadTifImage(filePath);
+      
+      if (!imageUrl) {
+        message.error('加载 1.tiff 失败');
+        return;
+      }
+
+      const selectedDoc = selectedDocs[0];
+      setDocuments(docs => docs.map(doc => 
+        doc.key === selectedDoc.key 
+          ? {
+              ...doc,
+              image: imageUrl,
+              fullImage: imageUrl,
+              fileName: '1.tiff',
+              isClassified: false
+            }
+          : doc
+      ));
+
+      message.success('替扫成功');
+    } catch (error) {
+      console.error('替扫失败:', error);
+      message.error('替扫失败');
+    }
   };
 
   const handleSaveTemp = () => {
