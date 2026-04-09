@@ -204,12 +204,12 @@ function MedicalRecordScan() {
     setSelectedMenu(key);
   };
 
-  const handleSelectAll = (e) => {
-    const checked = e.target.checked;
-    setSelectAll(checked);
+  const handleSelectAll = () => {
+    const newSelectAll = !selectAll;
+    setSelectAll(newSelectAll);
     setDocuments(docs => docs.map(doc => ({
       ...doc,
-      isSelected: checked
+      isSelected: newSelectAll
     })));
   };
 
@@ -343,6 +343,17 @@ function MedicalRecordScan() {
                 type="primary"
                 ghost
                 disabled={selectedCount === 0}
+                onClick={() => {
+                  Modal.confirm({
+                    title: '确认删除',
+                    content: `确定要删除选中的 ${selectedCount} 张图片吗？`,
+                    onOk() {
+                      setDocuments(docs => docs.filter(doc => !doc.isSelected));
+                      setSelectAll(false);
+                      message.success(`删除成功，共删除 ${selectedCount} 张图片`);
+                    }
+                  });
+                }}
               >
                 删除
               </Button>
