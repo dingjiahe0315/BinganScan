@@ -407,7 +407,6 @@ function MedicalRecordScan() {
             <Space size="middle" align="center">
               <Button 
                 type="primary"
-                ghost
                 onClick={handleSelectAll}
                 className="select-all-btn"
               >
@@ -415,7 +414,6 @@ function MedicalRecordScan() {
               </Button>
               <Button 
                 type="primary"
-                ghost
                 disabled={selectedCount === 0}
                 onClick={() => {
                   Modal.confirm({
