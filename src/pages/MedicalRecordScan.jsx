@@ -236,36 +236,98 @@ function MedicalRecordScan() {
     setScanProgress(0);
     message.info('开始扫描...');
 
-    const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
-    
-    for (let i = 0; i < tifFileNames.length; i++) {
-      const fileName = tifFileNames[i];
-      const filePath = `/sample-tiffs/${fileName}`;
-      const category = categories[i % categories.length];
+    try {
+      // 连接WebSocket服务器
+      const ws = new WebSocket('ws://localhost:8080');
       
-      const imageUrl = await loadTifImage(filePath);
+      // 等待连接建立
+      await new Promise((resolve, reject) => {
+        ws.onopen = () => {
+          console.log('WebSocket连接成功');
+          resolve();
+        };
+        ws.onerror = (error) => {
+          console.error('WebSocket连接错误:', error);
+          reject(new Error('WebSocket连接失败'));
+        };
+        ws.onclose = () => {
+          reject(new Error('WebSocket连接被关闭'));
+        };
+      });
+
+      // 调用第一个方法：开始扫描
+      await new Promise((resolve, reject) => {
+        ws.onmessage = (event) => {
+          const response = JSON.parse(event.data);
+          if (response.method === 'startScan') {
+            if (response.success) {
+              console.log('第一个方法执行成功:', response.message);
+              resolve();
+            } else {
+              reject(new Error('第一个方法执行失败'));
+            }
+          }
+        };
+        
+        ws.send(JSON.stringify({ method: 'startScan' }));
+      });
+
+      // 调用第二个方法：加载图片
+      await new Promise((resolve, reject) => {
+        ws.onmessage = (event) => {
+          const response = JSON.parse(event.data);
+          if (response.method === 'loadImages') {
+            if (response.success) {
+              console.log('第二个方法执行成功:', response.message);
+              resolve();
+            } else {
+              reject(new Error('第二个方法执行失败'));
+            }
+          }
+        };
+        
+        ws.send(JSON.stringify({ method: 'loadImages' }));
+      });
+
+      // 关闭WebSocket连接
+      ws.close();
+
+      // 两个方法都成功后，加载静态TIF图片
+      const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
       
-      setDocuments(prevDocs => [
-        ...prevDocs,
-        {
-          key: `tif-${i}`,
-          category: category,
-          image: imageUrl,
-          fullImage: imageUrl,
-          fileName: fileName,
-          isSelected: false,
-          isClassified: false
-        }
-      ]);
+      for (let i = 0; i < tifFileNames.length; i++) {
+        const fileName = tifFileNames[i];
+        const filePath = `/sample-tiffs/${fileName}`;
+        const category = categories[i % categories.length];
+        
+        const imageUrl = await loadTifImage(filePath);
+        
+        setDocuments(prevDocs => [
+          ...prevDocs,
+          {
+            key: `tif-${i}`,
+            category: category,
+            image: imageUrl,
+            fullImage: imageUrl,
+            fileName: fileName,
+            isSelected: false,
+            isClassified: false
+          }
+        ]);
+        
+        setScanProgress(Math.round(((i + 1) / tifFileNames.length) * 100));
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
       
-      setScanProgress(Math.round(((i + 1) / tifFileNames.length) * 100));
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-    
-    setTimeout(() => {
+      setTimeout(() => {
+        setIsScanning(false);
+        message.success(`扫描完成！共加载 ${tifFileNames.length} 张图片`);
+      }, 500);
+    } catch (error) {
+      console.error('扫描过程出错:', error);
       setIsScanning(false);
-      message.success(`扫描完成！共加载 ${tifFileNames.length} 张图片`);
-    }, 500);
+      message.error(`扫描失败: ${error.message}`);
+    }
   };
 
   const handleInsertPage = async () => {
