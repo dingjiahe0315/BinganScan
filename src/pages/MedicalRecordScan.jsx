@@ -16,175 +16,100 @@ import {
 } from 'antd';
 import { 
   FolderOutlined, 
-  FileTextOutlined, 
-  FilePdfOutlined
+  FileTextOutlined
 } from '@ant-design/icons';
 import './MedicalRecordScan.css';
 import * as UTIF from 'utif';
-import { getMedicalRecordMenu, getMockMedicalRecordMenu } from '../api/menuApi';
+import { getMedicalRecordMenu } from '../api/menuApi';
 
 const { Search } = Input;
 const { Content, Sider } = Layout;
 
-
-
-const tifFileNames = [
-  '1.tiff', '2.tiff', '3.tiff', '4.tiff', '5.tiff',
-  '6.tiff', '7.tiff', '8.tiff', '9.tiff', '10.tiff',
-  '11.tiff', '12.tiff', '13.tiff', '14.tiff', '15.tiff',
-  '16.tiff', 'blue-tiff-jpeg-comp.tif', 'blue-tiff-no-comp.tif',
-  'blue-tiff-zip-comp.tif', 'Space02-Default.tiff'
-];
-
+/**
+ * 加载并解析TIF/TIFF格式的图片文件
+ * 
+ * 功能描述：
+ * 1. 使用fetch API获取TIF文件的二进制数据
+ * 2. 使用UTIF库解析TIF格式，提取图像数据
+ * 3. 将TIF图像数据渲染到Canvas上
+ * 4. 对图像进行缩放，以适应显示尺寸要求
+ * 5. 将Canvas转换为JPEG格式的Data URL，便于在页面上显示
+ * 
+ * 技术要点：
+ * - UTIF库用于处理TIF/TIFF格式，支持多页、压缩等特性
+ * - Canvas API用于图像处理和格式转换
+ * - Data URL将二进制图像数据转换为可直接在img标签中使用的字符串
+ * 
+ * @param {string} filePath - TIF文件的路径（相对路径或绝对路径）
+ * @returns {string|null} JPEG格式的Data URL，如果加载失败则返回null
+ */
 const loadTifImage = async (filePath) => {
   try {
+    // 第一步：获取TIF文件的二进制数据
     const response = await fetch(filePath);
-    const arrayBuffer = await response.arrayBuffer();
+    const arrayBuffer = await response.arrayBuffer();  // 转换为ArrayBuffer
     
+    // 第二步：使用UTIF库解析TIF文件
+    // UTIF.decode解析TIF文件，返回IFD（图像文件目录）数组，每个IFD对应一页图像
     const ifds = UTIF.decode(arrayBuffer);
     
+    // 检查是否成功解析到图像数据
     if (ifds && ifds.length > 0) {
-      const ifd = ifds[0];
-      UTIF.decodeImage(arrayBuffer, ifd);
+      const ifd = ifds[0];  // 取第一页图像（TIF可能包含多页）
+      UTIF.decodeImage(arrayBuffer, ifd);  // 解码图像数据到ifd对象
       
+      // 第三步：创建Canvas并绘制原始TIF图像
       const canvas = document.createElement('canvas');
-      canvas.width = ifd.width;
-      canvas.height = ifd.height;
+      canvas.width = ifd.width;     // 设置Canvas宽度为图像宽度
+      canvas.height = ifd.height;   // 设置Canvas高度为图像高度
       const ctx = canvas.getContext('2d');
       
-      const rgba = UTIF.toRGBA8(ifd);
-      const imageData = ctx.createImageData(ifd.width, ifd.height);
-      imageData.data.set(rgba);
-      ctx.putImageData(imageData, 0, 0);
+      // 将UTIF解码的RGBA数据转换为Canvas可用的ImageData
+      const rgba = UTIF.toRGBA8(ifd);  // 获取RGBA格式的像素数据（Uint8Array）
+      const imageData = ctx.createImageData(ifd.width, ifd.height);  // 创建ImageData对象
+      imageData.data.set(rgba);  // 将RGBA数据复制到ImageData
+      ctx.putImageData(imageData, 0, 0);  // 将图像绘制到Canvas上
       
+      // 第四步：创建第二个Canvas进行图像缩放
+      // 为了优化显示性能，将图像缩放到适合预览的尺寸
       const resizeCanvas = document.createElement('canvas');
-      const maxWidth = 400;
-      const maxHeight = 560;
-      let ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height, 1);
-      resizeCanvas.width = Math.floor(canvas.width * ratio);
-      resizeCanvas.height = Math.floor(canvas.height * ratio);
+      const maxWidth = 400;   // 最大宽度限制
+      const maxHeight = 560;  // 最大高度限制
       
+      // 计算缩放比例：保持宽高比，不超过最大尺寸，且不放大（ratio ≤ 1）
+      let ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height, 1);
+      resizeCanvas.width = Math.floor(canvas.width * ratio);   // 计算缩放后宽度
+      resizeCanvas.height = Math.floor(canvas.height * ratio); // 计算缩放后高度
+      
+      // 在缩放Canvas上绘制已缩放的图像
       const resizeCtx = resizeCanvas.getContext('2d');
       resizeCtx.drawImage(canvas, 0, 0, resizeCanvas.width, resizeCanvas.height);
       
+      // 第五步：将Canvas转换为JPEG格式的Data URL并返回
+      // toDataURL参数说明：'image/jpeg'指定格式，0.85指定JPEG压缩质量（0-1）
       return resizeCanvas.toDataURL('image/jpeg', 0.85);
     }
     
+    // 如果没有解析到图像数据，抛出错误
     throw new Error('无法解析 TIF 文件');
   } catch (error) {
+    // 错误处理：记录错误日志，返回null表示加载失败
     console.error('加载 TIF 图片失败:', error);
     return null;
   }
 };
 
+/**
+ * 病案扫描主组件
+ * 
+ * 功能描述：
+ * 1. 提供病案扫描的完整界面
+ * 2. 包含左侧菜单栏、文档显示区域、扫描控制等功能
+ * 3. 支持图片拖拽排序、分类、插入、替换等操作
+ * 4. 集成WebSocket扫描和静态图片加载
+ */
 function MedicalRecordScan() {
-  // 默认菜单项（当API调用失败时使用）
-  const defaultMenuItems = [
-    {
-      key: 'overview',
-      label: '总览',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'record-home',
-      label: '病案首页',
-      icon: <FileTextOutlined />
-    },
-    {
-      key: 'admission-record',
-      label: '入院记录',
-      icon: <FileTextOutlined />
-    },
-    {
-      key: 'discharge-related',
-      label: '出院相关记录',
-      icon: <FolderOutlined />,
-      children: [
-        { 
-          key: 'discharge-death', 
-          label: '出院（死亡）记录', 
-          icon: <FilePdfOutlined /> 
-        },
-        { 
-          key: 'health-education', 
-          label: '患者健康教育处方', 
-          icon: <FilePdfOutlined /> 
-        },
-        { 
-          key: 'discharge-certificate', 
-          label: '出院医疗证明', 
-          icon: <FilePdfOutlined /> 
-        }
-      ]
-    },
-    {
-      key: 'progress-note',
-      label: '病程记录',
-      icon: <FolderOutlined />,
-      children: [
-        { 
-          key: 'discharge-discussion', 
-          label: '出院（死亡）讨论', 
-          icon: <FilePdfOutlined /> 
-        }
-      ]
-    },
-    {
-      key: 'consultation-record',
-      label: '知情谈话记录',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'surgery-related',
-      label: '手术相关记录与资料',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'approval-sheet',
-      label: '审批单',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'consultation-sheet',
-      label: '会诊单',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'specialist-assessment',
-      label: '专科评估记录单',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'difficult-case',
-      label: '疑难病历讨论',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'lab-report',
-      label: '检查检验报告',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'temperature-sheet',
-      label: '体温单',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'doctor-order',
-      label: '医嘱单',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'nursing-record',
-      label: '护理记录',
-      icon: <FolderOutlined />
-    },
-    {
-      key: 'other-related',
-      label: '其他相关资料',
-      icon: <FolderOutlined />
-    }
-  ];
+
 
   const [barcode, setBarcode] = useState('');
   const [selectedMenu, setSelectedMenu] = useState('overview');
@@ -195,104 +120,181 @@ function MedicalRecordScan() {
   const [scanProgress, setScanProgress] = useState(0);
   const [previewImage, setPreviewImage] = useState(null);
   // 新增状态：菜单数据
-  const [menuItems, setMenuItems] = useState(defaultMenuItems);
+  const [menuItems, setMenuItems] = useState([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [menuError, setMenuError] = useState(null);
+  // 扫描功能启用状态：当API调用失败时禁用所有扫描功能
+  const [scanEnabled, setScanEnabled] = useState(true);
   // 拖拽排序状态
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
-  // 获取菜单数据的effect
+  /**
+   * 获取菜单数据的Effect Hook
+   * 
+   * 功能描述：
+   * 1. 组件挂载时自动调用，获取左侧菜单栏数据
+   * 2. 尝试调用真实API获取数据，支持多种数据格式
+   * 3. 实现错误处理：真实API失败时使用默认数据并禁用扫描功能
+   * 4. 管理加载状态和错误状态，提供良好的用户体验
+   * 
+   * 数据源优先级：
+   * 1. 真实API（getMedicalRecordMenu） - 生产环境首选
+   * 2. 失败时返回空数据 - API失败时显示未获取到数据
+   * 
+   * 扫描功能控制：
+   * - 真实API成功：启用扫描功能
+   * - 真实API失败或数据格式不正确：禁用扫描功能
+   * 
+   * 依赖项：[] 空数组表示只在组件挂载时执行一次
+   */
   useEffect(() => {
     const fetchMenuData = async () => {
+      // 初始化状态：开始加载，清除之前的错误
       setMenuLoading(true);
       setMenuError(null);
       
       try {
-        // 尝试调用真实API获取菜单数据
+        // ==================== 第一步：尝试调用真实API ====================
+        // 调用真实API获取菜单数据
         const response = await getMedicalRecordMenu();
         
-        // API返回格式：{ code: 200, body: [...] }
+        // API返回格式：{ code: 200, body: [...] }，code为200表示成功
         if (response && response.code === 200 && Array.isArray(response.body)) {
-          // 将API返回的菜单数据转换为Ant Design Menu需要的格式
+          // 成功获取数据：转换为Ant Design Menu需要的格式
           const formattedMenuItems = formatMenuItems(response.body);
           setMenuItems(formattedMenuItems);
+          setScanEnabled(true);  // 启用扫描功能
         } else {
-          // API返回数据格式不正确，使用默认数据
-          console.warn('API返回数据格式不正确，使用默认菜单数据', response);
-          setMenuItems(defaultMenuItems);
+          // API返回数据格式不正确：返回空数据并禁用扫描功能
+          console.warn('API返回数据格式不正确，返回空数据', response);
+          setMenuItems([]);
           setMenuError('API返回数据格式不正确');
+          setScanEnabled(false); // 禁用扫描功能
         }
       } catch (error) {
-        console.warn('获取菜单数据失败，使用默认数据:', error.message);
-        setMenuItems(defaultMenuItems);
+        // ==================== 第二步：真实API失败，返回空数据并禁用扫描功能 ====================
+        console.warn('获取菜单数据失败，返回空数据:', error.message);
+        setMenuItems([]);
         setMenuError(`获取菜单失败: ${error.message}`);
-        
-        // 可以尝试使用模拟数据（用于开发测试）
-        try {
-          const mockData = await getMockMedicalRecordMenu();
-          let itemsToFormat;
-          
-          // 模拟数据有两种格式：新格式 { code: 200, body: [...] } 或旧格式 { menuItems: [...] }
-          if (mockData && mockData.code === 200 && Array.isArray(mockData.body)) {
-            itemsToFormat = mockData.body;
-          } else if (mockData && mockData.menuItems && Array.isArray(mockData.menuItems)) {
-            itemsToFormat = mockData.menuItems;
-          }
-          
-          if (itemsToFormat) {
-            const formattedMenuItems = formatMenuItems(itemsToFormat);
-            setMenuItems(formattedMenuItems);
-            setMenuError(null);
-          }
-        } catch (mockError) {
-          console.error('连模拟数据也失败:', mockError);
-        }
+        setScanEnabled(false); // 禁用扫描功能
       } finally {
+        // ==================== 第四步：无论成功与否，结束加载状态 ====================
         setMenuLoading(false);
       }
     };
 
+    // 执行数据获取函数
     fetchMenuData();
-  }, []);
+  }, []);  // 空依赖数组：只在组件挂载时执行一次
 
-  // 格式化菜单项，将API返回的数据转换为Ant Design Menu需要的格式
+
+
+  /**
+   * 格式化菜单项，将API返回的数据转换为Ant Design Menu需要的格式
+   * 
+   * 功能描述：
+   * 1. 数据验证：验证输入是否为有效数组
+   * 2. 字段映射：将API字段映射为Ant Design Menu要求的字段（key, label, icon, children）
+   * 3. 标签生成：直接使用name字段作为显示标签
+   * 4. 图标选择：根据节点是否包含children属性决定使用文件夹图标还是文件图标
+   * 5. 递归处理：根据children字段递归格式化所有子菜单项
+   * 6. 排序：按照serialNumber或code对菜单项进行排序
+   * 
+   * 数据处理流程：
+   * 1. 输入验证 → 2. 字段映射和格式化 → 3. 递归处理子节点 → 4. 排序 → 5. 返回结果
+   * 
+   * 关键说明：
+   * - 后端返回的数据已经是树形结构，children字段包含子节点数据
+   * - parentId字段无需处理，直接忽略
+   * - code字段是一个类似于ID的标识符，仅用于排序，不用于标签生成
+   * - 区分文件夹和文件的正确方式是：检查节点是否包含children属性（无论是否为空数组）
+   *   - 有children属性的节点视为文件夹（使用FolderOutlined图标）
+   *   - 没有children属性的节点视为文件（使用FileTextOutlined图标）
+   * - 标签生成逻辑：直接使用name字段作为显示标签
+   * - 排序逻辑：优先使用serialNumber字段，其次尝试将code解析为数字进行排序
+   * 
+   * 注意事项：
+   * - 空数组处理：输入为空数组时，直接返回空数组
+   * - 字段兼容性：支持多种ID字段名（medicalRecordArchiveTpId > id > key）
+   * - 错误处理：任何处理失败时，返回空数组
+   * 
+   * @param {Array} items - API返回的菜单项数组，应为树形结构（包含children字段）
+   * @returns {Array} 格式化后的菜单项数组，符合Ant Design Menu组件要求
+   */
   const formatMenuItems = (items) => {
+    // 参数验证：确保输入是有效的数组
     if (!items || !Array.isArray(items)) {
-      return defaultMenuItems;
+      return [];  // 返回空数组
     }
     
-    return items.map(item => {
-      // 根据API返回的字段名映射
-      const key = item.medicalRecordArchiveTpId || item.id || item.key;
-      const label = item.name || item.label || '未命名';
-      const code = item.code || '';
+    // 空数组处理：如果输入为空数组，直接返回空数组
+    if (items.length === 0) {
+      return [];
+    }
+    
+    // 直接使用items进行格式化：后端返回的数据已经是树形结构，children字段包含子节点数据
+    // parentId字段无需处理，直接忽略
+    const itemsToFormat = items;  // 待格式化的数据
+    
+    // 格式化每个菜单项：将API数据结构转换为Ant Design Menu数据结构
+    const formattedItems = itemsToFormat.map(item => {
+      // 字段映射：API返回的字段名可能不同，统一映射为标准字段
+      // 唯一标识符，转换为字符串以确保类型一致性
+      const key = String(item.medicalRecordArchiveTpId || item.id || item.key);
+      const name = item.name || item.label || '未命名';                 // 显示名称
       
-      // 根据code值确定图标类型
-      let iconType;
-      if (code === '-1' || code === '0' || code.startsWith('F')) {
-        // -1或0开头或F开头可能是文件夹
-        iconType = 'folder';
-      } else if (parseInt(code) > 0) {
-        // 正数可能是文件
-        iconType = 'file-text';
-      } else {
-        iconType = 'folder';
+      // 生成显示标签：直接使用name
+      let label = name;
+      
+      // 处理子菜单：如果存在children属性且为数组，则递归格式化
+      let children = null;
+      const hasChildrenProperty = item.children !== undefined && Array.isArray(item.children);
+      
+      if (hasChildrenProperty) {
+        // 递归格式化子节点，即使item.children为空数组也会处理
+        children = formatMenuItems(item.children);
       }
       
-      // 构建格式化后的菜单项
+      // 根据是否包含children属性确定图标类型
+      // 规则：有children属性的节点视为文件夹，没有children属性的节点视为文件
+      const icon = hasChildrenProperty ? <FolderOutlined /> : <FileTextOutlined />;
+      
+      // 构建格式化后的菜单项，符合Ant Design Menu组件要求
       const formattedItem = {
-        key: key,
-        label: label,
-        icon: iconType === 'folder' ? <FolderOutlined /> : <FileTextOutlined />
+        key: key,      // 菜单项的唯一标识
+        label: label,  // 菜单项显示文本
+        icon: icon
       };
       
-      // 递归处理子菜单
-      if (item.children && Array.isArray(item.children) && item.children.length > 0) {
-        formattedItem.children = formatMenuItems(item.children);
+      // 如果有children属性（无论是否为空数组），都添加到格式化后的菜单项中
+      if (hasChildrenProperty) {
+        formattedItem.children = children;
       }
       
       return formattedItem;
+    });
+    
+    // 对格式化后的菜单项进行排序（按serialNumber或code）
+    // 排序规则：优先使用serialNumber字段，其次使用code字段
+    return formattedItems.sort((a, b) => {
+      // 从原始数据中获取排序字段（因为格式化后的数据可能丢失了原始字段）
+      const originalA = items.find(item => 
+        String(item.medicalRecordArchiveTpId || item.id || item.key) === a.key
+      );
+      const originalB = items.find(item => 
+        String(item.medicalRecordArchiveTpId || item.id || item.key) === b.key
+      );
+      
+      if (!originalA || !originalB) return 0;  // 如果找不到原始数据，保持原顺序
+      
+      // 优先使用serialNumber，其次使用code
+      const aNum = originalA.serialNumber !== undefined ? originalA.serialNumber : 
+                  parseInt(originalA.code) || parseFloat(originalA.code) || 0;
+      const bNum = originalB.serialNumber !== undefined ? originalB.serialNumber : 
+                  parseInt(originalB.code) || parseFloat(originalB.code) || 0;
+      
+      return aNum - bNum;  // 升序排序
     });
   };
 
@@ -300,66 +302,136 @@ function MedicalRecordScan() {
   const classifiedCount = documents.filter(doc => doc.isClassified).length;
   const unclassifiedCount = documents.length - classifiedCount;
 
-  // 拖拽排序处理函数
+  // ==================== 拖拽排序处理函数 ====================
+  /**
+   * 处理拖拽开始事件
+   * 
+   * 功能描述：
+   * 1. 记录被拖拽元素的索引
+   * 2. 设置拖拽操作类型为'move'（移动）
+   * 3. 将拖拽数据存储在dataTransfer对象中
+   * 4. 为被拖拽元素添加视觉样式（通过CSS类名）
+   * 
+   * @param {DragEvent} e - HTML5拖拽事件对象
+   * @param {number} index - 被拖拽元素在文档数组中的索引
+   */
   const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', index);
-    // 添加拖拽中的样式
+    setDraggedIndex(index);                     // 记录被拖拽元素的索引
+    e.dataTransfer.effectAllowed = 'move';      // 设置拖拽操作为移动
+    e.dataTransfer.setData('text/plain', index); // 存储拖拽数据（索引）
+    
+    // 异步添加拖拽样式，确保DOM已更新
     setTimeout(() => {
       const draggedElement = e.target.closest('.document-card');
       if (draggedElement) {
-        draggedElement.classList.add('dragging');
+        draggedElement.classList.add('dragging');  // 添加拖拽中的CSS类
       }
     }, 0);
   };
 
+  /**
+   * 处理拖拽悬停事件（元素被拖拽到目标上方时持续触发）
+   * 
+   * 功能描述：
+   * 1. 阻止浏览器默认行为（否则不会触发drop事件）
+   * 2. 设置拖拽视觉效果为'move'
+   * 3. 如果悬停位置不是被拖拽元素本身，则更新dragOverIndex状态
+   * 
+   * @param {DragEvent} e - HTML5拖拽事件对象
+   * @param {number} index - 当前悬停元素在文档数组中的索引
+   */
   const handleDragOver = (e, index) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.preventDefault();                         // 必须调用，否则drop事件不会触发
+    e.dataTransfer.dropEffect = 'move';         // 设置拖拽视觉效果
+    
+    // 如果悬停位置不是被拖拽元素本身，则更新dragOverIndex状态
     if (draggedIndex !== null && draggedIndex !== index) {
       setDragOverIndex(index);
     }
   };
 
+  /**
+   * 处理拖拽进入事件（元素首次进入目标区域时触发）
+   * 
+   * 功能描述：
+   * 1. 阻止浏览器默认行为
+   * 2. 如果进入位置不是被拖拽元素本身，则更新dragOverIndex状态
+   * 
+   * @param {DragEvent} e - HTML5拖拽事件对象
+   * @param {number} index - 当前进入元素在文档数组中的索引
+   */
   const handleDragEnter = (e, index) => {
-    e.preventDefault();
+    e.preventDefault();  // 必须调用，否则drop事件不会触发
+    
     if (draggedIndex !== null && draggedIndex !== index) {
       setDragOverIndex(index);
     }
   };
 
+  /**
+   * 处理拖拽离开事件（元素离开目标区域时触发）
+   * 
+   * 功能描述：
+   * 1. 检查拖拽是否真正离开了当前元素（而不是进入其子元素）
+   * 2. 如果真正离开，则清除dragOverIndex状态
+   * 
+   * @param {DragEvent} e - HTML5拖拽事件对象
+   */
   const handleDragLeave = (e) => {
-    // 检查是否离开到子元素
+    // 检查拖拽是否离开到当前元素的子元素
+    // 如果relatedTarget是当前元素的子元素，说明拖拽仍在当前元素内部
     const relatedTarget = e.relatedTarget;
     if (!e.currentTarget.contains(relatedTarget)) {
-      setDragOverIndex(null);
+      setDragOverIndex(null);  // 拖拽真正离开了当前元素，清除悬停状态
     }
   };
 
+  /**
+   * 处理拖拽放置事件（元素被释放时触发）
+   * 
+   * 功能描述：
+   * 1. 阻止浏览器默认行为（否则可能会打开链接等）
+   * 2. 检查放置位置是否有效（不是拖拽元素本身）
+   * 3. 重新排序文档数组：将被拖拽元素从原位置移除，插入到新位置
+   * 4. 更新状态，显示成功消息
+   * 5. 清理拖拽状态
+   * 
+   * @param {DragEvent} e - HTML5拖拽事件对象
+   * @param {number} dropIndex - 放置位置在文档数组中的索引
+   */
   const handleDrop = (e, dropIndex) => {
-    e.preventDefault();
+    e.preventDefault();  // 必须调用，防止浏览器默认行为
+    
+    // 检查放置位置是否有效：不能是拖拽元素本身，也不能没有拖拽元素
     if (draggedIndex === null || draggedIndex === dropIndex) {
-      handleDragEnd();
+      handleDragEnd();  // 清理拖拽状态
       return;
     }
 
-    // 重新排序文档
-    const newDocuments = [...documents];
-    const draggedItem = newDocuments[draggedIndex];
-    newDocuments.splice(draggedIndex, 1);
-    newDocuments.splice(dropIndex, 0, draggedItem);
+    // 重新排序文档：使用不可变方式更新数组
+    const newDocuments = [...documents];                 // 创建文档数组的副本
+    const draggedItem = newDocuments[draggedIndex];      // 获取被拖拽的元素
+    newDocuments.splice(draggedIndex, 1);                // 从原位置移除
+    newDocuments.splice(dropIndex, 0, draggedItem);      // 插入到新位置
 
-    setDocuments(newDocuments);
-    message.success(`已将图片移动到第 ${dropIndex + 1} 位`);
+    setDocuments(newDocuments);                          // 更新状态
+    message.success(`已将图片移动到第 ${dropIndex + 1} 位`);  // 用户反馈
 
-    handleDragEnd();
+    handleDragEnd();  // 清理拖拽状态
   };
 
+  /**
+   * 处理拖拽结束事件（无论拖拽是否成功都会触发）
+   * 
+   * 功能描述：
+   * 1. 重置拖拽相关状态（draggedIndex和dragOverIndex）
+   * 2. 移除所有拖拽相关的CSS样式类
+   */
   const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-    // 移除所有拖拽样式
+    setDraggedIndex(null);    // 清除被拖拽元素索引
+    setDragOverIndex(null);   // 清除悬停元素索引
+    
+    // 移除所有拖拽相关的CSS样式类
     document.querySelectorAll('.document-card.dragging').forEach(el => {
       el.classList.remove('dragging');
     });
@@ -376,6 +448,13 @@ function MedicalRecordScan() {
     setSelectedMenu(key);
   };
 
+  /**
+   * 全选/取消全选处理函数
+   * 
+   * 功能描述：
+   * 1. 切换全选状态
+   * 2. 更新所有文档的选中状态
+   */
   const handleSelectAll = () => {
     const newSelectAll = !selectAll;
     setSelectAll(newSelectAll);
@@ -398,6 +477,16 @@ function MedicalRecordScan() {
     message.success('删除成功');
   };
 
+  /**
+   * 开始扫描处理函数
+   * 
+   * 功能描述：
+   * 1. 检查是否正在扫描，避免重复操作
+   * 2. 连接WebSocket服务器执行扫描操作
+   * 3. 如果WebSocket成功，则显示WebSocket返回的TIF图片
+   * 4. 如果WebSocket失败，则不显示任何图片
+   * 5. 更新扫描进度和状态
+   */
   const handleStartScan = async () => {
     if (isScanning) {
       message.warning('正在扫描中，请稍候...');
@@ -408,7 +497,7 @@ function MedicalRecordScan() {
     setScanProgress(0);
     message.info('开始扫描...');
 
-    // 尝试连接WebSocket并执行方法，如果失败则继续使用静态图片
+    // 尝试连接WebSocket并执行方法，如果失败则不显示任何图片
     try {
       // 连接WebSocket服务器
       const ws = new WebSocket('ws://localhost:8080');
@@ -443,15 +532,27 @@ function MedicalRecordScan() {
         ws.send(JSON.stringify({ method: 'startScan' }));
       });
 
-      // 调用第二个方法：加载图片
-      await new Promise((resolve, reject) => {
+      // 调用第二个方法：加载图片，并获取图片数据
+      // 预期WebSocket服务器返回格式：
+      // {
+      //   "method": "loadImages",
+      //   "success": true,
+      //   "images": [
+      //     {
+      //       "imageUrl": "data:image/jpeg;base64,...", // 图片数据
+      //       "fileName": "image-1.tiff",              // 文件名
+      //       "category": "病案首页"                    // 分类（可选）
+      //     }
+      //   ]
+      // }
+      const imagesData = await new Promise((resolve, reject) => {
         ws.onmessage = (event) => {
           const response = JSON.parse(event.data);
           if (response.method === 'loadImages') {
-            if (response.success) {
-              resolve();
+            if (response.success && response.images && Array.isArray(response.images)) {
+              resolve(response.images);
             } else {
-              reject(new Error('第二个方法执行失败'));
+              reject(new Error('第二个方法执行失败或返回数据格式不正确'));
             }
           }
         };
@@ -462,104 +563,72 @@ function MedicalRecordScan() {
       // 关闭WebSocket连接
       ws.close();
       message.info('WebSocket操作成功完成');
-    } catch (error) {
-      console.warn('WebSocket连接或操作失败，继续使用静态图片:', error);
-      message.warning('WebSocket连接失败，使用静态图片继续扫描');
-    }
 
-    // 无论WebSocket是否成功，都加载静态TIF图片
-    try {
-      const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
-      
-      for (let i = 0; i < tifFileNames.length; i++) {
-        const fileName = tifFileNames[i];
-        const filePath = `/sample-tiffs/${fileName}`;
-        const category = categories[i % categories.length];
+      // 使用WebSocket返回的图片数据创建文档
+      try {
+        const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
         
-        const imageUrl = await loadTifImage(filePath);
-        
-        setDocuments(prevDocs => [
-          ...prevDocs,
-          {
-            key: `tif-${i}`,
-            order: prevDocs.length + 1,
-            category: category,
-            image: imageUrl,
-            fullImage: imageUrl,
-            fileName: fileName,
-            isSelected: false,
-            isClassified: false
+        for (let i = 0; i < imagesData.length; i++) {
+          const imageData = imagesData[i];
+          // WebSocket服务器返回的图片数据格式假设：
+          // imageData应包含imageUrl、fileName、category等字段
+          // imageUrl可以是Data URL、base64编码或图片URL
+          // 支持多种字段名：imageUrl、url、data
+          const imageUrl = imageData.imageUrl || imageData.url || imageData.data;
+          const fileName = imageData.fileName || `image-${i}.tiff`;
+          const category = imageData.category || categories[i % categories.length];
+          
+          if (!imageUrl) {
+            console.warn(`第 ${i + 1} 张图片数据缺少imageUrl`, imageData);
+            continue;
           }
-        ]);
+          
+          setDocuments(prevDocs => [
+            ...prevDocs,
+            {
+              key: `ws-${i}-${Date.now()}`,
+              order: prevDocs.length + 1,
+              category: category,
+              image: imageUrl,
+              fullImage: imageUrl,
+              fileName: fileName,
+              isSelected: false,
+              isClassified: false
+            }
+          ]);
+          
+          setScanProgress(Math.round(((i + 1) / imagesData.length) * 100));
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
         
-        setScanProgress(Math.round(((i + 1) / tifFileNames.length) * 100));
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-      
-      setTimeout(() => {
+        setTimeout(() => {
+          setIsScanning(false);
+          message.success(`扫描完成！共加载 ${imagesData.length} 张图片`);
+        }, 500);
+      } catch (error) {
+        console.error('处理WebSocket返回的图片数据失败:', error);
         setIsScanning(false);
-        message.success(`扫描完成！共加载 ${tifFileNames.length} 张图片`);
-      }, 500);
-    } catch (error) {
-      console.error('加载静态图片失败:', error);
-      setIsScanning(false);
-      message.error('加载静态图片失败，请检查图片文件');
-    }
-  };
-
-  // 重试获取菜单数据
-  const handleRetryMenu = async () => {
-    setMenuLoading(true);
-    setMenuError(null);
-    
-      try {
-        console.log('重试获取菜单数据...');
-        const response = await getMedicalRecordMenu();
-        
-        // API返回格式：{ code: 200, body: [...] }
-        if (response && response.code === 200 && Array.isArray(response.body)) {
-          const formattedMenuItems = formatMenuItems(response.body);
-          setMenuItems(formattedMenuItems);
-          console.log('菜单数据重试成功', formattedMenuItems.length, '项');
-          message.success('菜单加载成功');
-        } else {
-          console.warn('API返回数据格式不正确，使用默认菜单数据', response);
-          setMenuItems(defaultMenuItems);
-          setMenuError('API返回数据格式不正确');
-          message.warning('菜单数据格式错误，使用默认菜单');
-        }
-    } catch (error) {
-      console.warn('重试获取菜单数据失败，使用默认数据:', error.message);
-      setMenuItems(defaultMenuItems);
-      setMenuError(`获取菜单失败: ${error.message}`);
-      message.warning('菜单加载失败，使用默认菜单');
-      
-      // 尝试使用模拟数据
-      try {
-        const mockData = await getMockMedicalRecordMenu();
-        let itemsToFormat;
-        
-        // 模拟数据有两种格式：新格式 { code: 200, body: [...] } 或旧格式 { menuItems: [...] }
-        if (mockData && mockData.code === 200 && Array.isArray(mockData.body)) {
-          itemsToFormat = mockData.body;
-        } else if (mockData && mockData.menuItems && Array.isArray(mockData.menuItems)) {
-          itemsToFormat = mockData.menuItems;
-        }
-        
-        if (itemsToFormat) {
-          const formattedMenuItems = formatMenuItems(itemsToFormat);
-          setMenuItems(formattedMenuItems);
-          setMenuError(null);
-          message.info('使用模拟菜单数据');
-        }
-      } catch (mockError) {
-        console.error('连模拟数据也失败:', mockError);
+        message.error('处理图片数据失败');
       }
-    } finally {
-      setMenuLoading(false);
+    } catch (error) {
+      console.warn('WebSocket连接或操作失败，不显示任何图片:', error);
+      message.warning('WebSocket连接失败，扫描已取消');
+      setIsScanning(false);
+      return;
     }
   };
 
+
+
+  /**
+   * 插入页面处理函数
+   * 
+   * 功能描述：
+   * 1. 检查是否有选中的图片
+   * 2. 加载1.tiff作为插入图片
+   * 3. 在每张选中图片后插入新图片
+   * 4. 更新文档列表并显示成功消息
+   */
   const handleInsertPage = async () => {
     const selectedDocs = documents.filter(doc => doc.isSelected);
     if (selectedDocs.length === 0) {
@@ -578,7 +647,7 @@ function MedicalRecordScan() {
 
       const newDocument = {
         key: `tif-insert-${Date.now()}`,
-        order: newDocuments.length + 1,
+        order: documents.length + 1,
         category: '插入页面',
         image: imageUrl,
         fullImage: imageUrl,
@@ -603,6 +672,15 @@ function MedicalRecordScan() {
     }
   };
 
+  /**
+   * 替扫处理函数（替换扫描）
+   * 
+   * 功能描述：
+   * 1. 检查是否只选中一张图片
+   * 2. 加载1.tiff作为替换图片
+   * 3. 替换选中图片的内容
+   * 4. 更新文档列表并显示成功消息
+   */
   const handleRescan = async () => {
     const selectedDocs = documents.filter(doc => doc.isSelected);
     if (selectedDocs.length === 0) {
@@ -643,10 +721,24 @@ function MedicalRecordScan() {
     }
   };
 
+  /**
+   * 扫描暂存处理函数
+   * 
+   * 功能描述：
+   * 1. 显示扫描暂存成功的消息
+   * 2. 用于临时保存扫描进度
+   */
   const handleSaveTemp = () => {
     message.success('扫描暂存成功');
   };
 
+  /**
+   * 扫描完成处理函数
+   * 
+   * 功能描述：
+   * 1. 显示确认对话框，展示已分类文档数量
+   * 2. 用户确认后显示扫描完成消息
+   */
   const handleScanComplete = () => {
     Modal.confirm({
       title: '确认完成扫描？',
@@ -726,30 +818,35 @@ function MedicalRecordScan() {
                 <Button 
                   type="primary" 
                   onClick={handleStartScan}
+                  disabled={!scanEnabled || isScanning}
                 >
                   开始扫描
                 </Button>
                 <Button 
                   type="primary" 
                   onClick={handleInsertPage}
+                  disabled={!scanEnabled || isScanning}
                 >
                   插描
                 </Button>
                 <Button 
                   type="primary" 
                   onClick={handleRescan}
+                  disabled={!scanEnabled || isScanning}
                 >
                   替扫
                 </Button>
                 <Button 
                   type="primary" 
                   onClick={handleSaveTemp}
+                  disabled={!scanEnabled || isScanning}
                 >
                   扫描暂存
                 </Button>
                 <Button 
                   type="primary" 
                   onClick={handleScanComplete}
+                  disabled={!scanEnabled || isScanning}
                 >
                   扫描完成
                 </Button>
@@ -783,15 +880,8 @@ function MedicalRecordScan() {
               </div>
               <div style={{ fontSize: '14px', marginBottom: '8px' }}>菜单加载失败</div>
               <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>{menuError}</div>
-              <div style={{ fontSize: '12px', color: '#999', marginBottom: '12px' }}>已使用默认菜单</div>
-              <Button 
-                type="primary" 
-                size="small"
-                onClick={handleRetryMenu}
-                style={{ marginTop: '8px' }}
-              >
-                重试
-              </Button>
+              <div style={{ fontSize: '12px', color: '#999', marginBottom: '12px' }}>未获取到数据</div>
+
             </div>
           ) : (
             <Menu
