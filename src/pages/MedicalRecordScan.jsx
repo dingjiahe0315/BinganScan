@@ -236,6 +236,7 @@ function MedicalRecordScan() {
     setScanProgress(0);
     message.info('开始扫描...');
 
+    // 尝试连接WebSocket并执行方法，如果失败则继续使用静态图片
     try {
       // 连接WebSocket服务器
       const ws = new WebSocket('ws://localhost:8080');
@@ -291,8 +292,14 @@ function MedicalRecordScan() {
 
       // 关闭WebSocket连接
       ws.close();
+      message.info('WebSocket操作成功完成');
+    } catch (error) {
+      console.warn('WebSocket连接或操作失败，继续使用静态图片:', error);
+      message.warning('WebSocket连接失败，使用静态图片继续扫描');
+    }
 
-      // 两个方法都成功后，加载静态TIF图片
+    // 无论WebSocket是否成功，都加载静态TIF图片
+    try {
       const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
       
       for (let i = 0; i < tifFileNames.length; i++) {
@@ -324,9 +331,9 @@ function MedicalRecordScan() {
         message.success(`扫描完成！共加载 ${tifFileNames.length} 张图片`);
       }, 500);
     } catch (error) {
-      console.error('扫描过程出错:', error);
+      console.error('加载静态图片失败:', error);
       setIsScanning(false);
-      message.error(`扫描失败: ${error.message}`);
+      message.error('加载静态图片失败，请检查图片文件');
     }
   };
 
