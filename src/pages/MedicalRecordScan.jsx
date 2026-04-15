@@ -17,9 +17,7 @@ import {
 import { 
   FolderOutlined, 
   FileTextOutlined, 
-  FilePdfOutlined,
-  RightOutlined,
-  DownOutlined
+  FilePdfOutlined
 } from '@ant-design/icons';
 import './MedicalRecordScan.css';
 import * as UTIF from 'utif';
@@ -212,7 +210,6 @@ function MedicalRecordScan() {
       
       try {
         // 尝试调用真实API获取菜单数据
-        console.log('正在获取菜单数据...');
         const response = await getMedicalRecordMenu();
         
         // API返回格式：{ code: 200, body: [...] }
@@ -220,7 +217,6 @@ function MedicalRecordScan() {
           // 将API返回的菜单数据转换为Ant Design Menu需要的格式
           const formattedMenuItems = formatMenuItems(response.body);
           setMenuItems(formattedMenuItems);
-          console.log('菜单数据获取成功', formattedMenuItems.length, '项');
         } else {
           // API返回数据格式不正确，使用默认数据
           console.warn('API返回数据格式不正确，使用默认菜单数据', response);
@@ -247,7 +243,6 @@ function MedicalRecordScan() {
           if (itemsToFormat) {
             const formattedMenuItems = formatMenuItems(itemsToFormat);
             setMenuItems(formattedMenuItems);
-            console.log('使用模拟菜单数据', formattedMenuItems.length, '项');
             setMenuError(null);
           }
         } catch (mockError) {
@@ -289,9 +284,7 @@ function MedicalRecordScan() {
       const formattedItem = {
         key: key,
         label: label,
-        icon: iconType === 'folder' ? <FolderOutlined /> : <FileTextOutlined />,
-        // 保留原始数据，方便调试
-        original: item
+        icon: iconType === 'folder' ? <FolderOutlined /> : <FileTextOutlined />
       };
       
       // 递归处理子菜单
@@ -423,7 +416,6 @@ function MedicalRecordScan() {
       // 等待连接建立
       await new Promise((resolve, reject) => {
         ws.onopen = () => {
-          console.log('WebSocket连接成功');
           resolve();
         };
         ws.onerror = (error) => {
@@ -441,7 +433,6 @@ function MedicalRecordScan() {
           const response = JSON.parse(event.data);
           if (response.method === 'startScan') {
             if (response.success) {
-              console.log('第一个方法执行成功:', response.message);
               resolve();
             } else {
               reject(new Error('第一个方法执行失败'));
@@ -458,7 +449,6 @@ function MedicalRecordScan() {
           const response = JSON.parse(event.data);
           if (response.method === 'loadImages') {
             if (response.success) {
-              console.log('第二个方法执行成功:', response.message);
               resolve();
             } else {
               reject(new Error('第二个方法执行失败'));
@@ -559,7 +549,6 @@ function MedicalRecordScan() {
         if (itemsToFormat) {
           const formattedMenuItems = formatMenuItems(itemsToFormat);
           setMenuItems(formattedMenuItems);
-          console.log('使用模拟菜单数据', formattedMenuItems.length, '项');
           setMenuError(null);
           message.info('使用模拟菜单数据');
         }
@@ -812,7 +801,6 @@ function MedicalRecordScan() {
               onOpenChange={handleMenuOpenChange}
               onClick={handleMenuClick}
               items={menuItems}
-              expandIcon={({ isOpen }) => isOpen ? <DownOutlined /> : <RightOutlined />}
             />
           )}
         </Sider>

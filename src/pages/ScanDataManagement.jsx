@@ -232,11 +232,7 @@ function ScanDataManagement() {
     }
   ];
 
-  const tabItems = [
-    { key: 'inpatient', label: '住院' },
-    { key: 'emergency', label: '急诊' },
-    { key: 'outpatient', label: '门诊' }
-  ];
+
 
   return (
     <div className="scan-data-management">

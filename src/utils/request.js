@@ -25,7 +25,7 @@ export function request(params) {
     ...data
   };
   
-  console.log(`调用API: ${serviceId}.${serverMethod}`, requestBody);
+
   
   return fetch(requestUrl, {
     method: 'POST',
@@ -55,40 +55,3 @@ export function request(params) {
     });
 }
 
-/**
- * 简化的请求函数（备用方案）
- * @param {Object} options - 请求选项
- * @param {string} options.url - 请求URL
- * @param {Object} [options.data] - 请求数据
- * @param {string} [options.method] - 请求方法，默认为GET
- * @returns {Promise<any>} 返回Promise
- */
-export function simpleRequest(options) {
-  const { url, data = {}, method = 'GET' } = options;
-  
-  const requestOptions = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-  };
-  
-  if (method !== 'GET' && data) {
-    requestOptions.body = JSON.stringify(data);
-  }
-  
-  console.log(`请求: ${method} ${url}`, data);
-  
-  return fetch(url, requestOptions)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .catch(error => {
-      console.error(`请求错误: ${url}`, error);
-      throw error;
-    });
-}
