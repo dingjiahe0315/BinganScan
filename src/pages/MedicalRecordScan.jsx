@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Layout, 
   Menu, 
@@ -11,7 +11,8 @@ import {
   Col,
   Space,
   Progress,
-  Image
+  Image,
+  Spin
 } from 'antd';
 import { 
   FolderOutlined, 
@@ -22,116 +23,12 @@ import {
 } from '@ant-design/icons';
 import './MedicalRecordScan.css';
 import * as UTIF from 'utif';
+import { getMedicalRecordMenu, getMockMedicalRecordMenu } from '../api/menuApi';
 
 const { Search } = Input;
 const { Content, Sider } = Layout;
 
-const menuItems = [
-  {
-    key: 'overview',
-    label: '总览',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'record-home',
-    label: '病案首页',
-    icon: <FileTextOutlined />
-  },
-  {
-    key: 'admission-record',
-    label: '入院记录',
-    icon: <FileTextOutlined />
-  },
-  {
-    key: 'discharge-related',
-    label: '出院相关记录',
-    icon: <FolderOutlined />,
-    children: [
-      { 
-        key: 'discharge-death', 
-        label: '出院（死亡）记录', 
-        icon: <FilePdfOutlined /> 
-      },
-      { 
-        key: 'health-education', 
-        label: '患者健康教育处方', 
-        icon: <FilePdfOutlined /> 
-      },
-      { 
-        key: 'discharge-certificate', 
-        label: '出院医疗证明', 
-        icon: <FilePdfOutlined /> 
-      }
-    ]
-  },
-  {
-    key: 'progress-note',
-    label: '病程记录',
-    icon: <FolderOutlined />,
-    children: [
-      { 
-        key: 'discharge-discussion', 
-        label: '出院（死亡）讨论', 
-        icon: <FilePdfOutlined /> 
-      }
-    ]
-  },
-  {
-    key: 'consultation-record',
-    label: '知情谈话记录',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'surgery-related',
-    label: '手术相关记录与资料',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'approval-sheet',
-    label: '审批单',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'consultation-sheet',
-    label: '会诊单',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'specialist-assessment',
-    label: '专科评估记录单',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'difficult-case',
-    label: '疑难病历讨论',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'lab-report',
-    label: '检查检验报告',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'temperature-sheet',
-    label: '体温单',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'doctor-order',
-    label: '医嘱单',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'nursing-record',
-    label: '护理记录',
-    icon: <FolderOutlined />
-  },
-  {
-    key: 'other-related',
-    label: '其他相关资料',
-    icon: <FolderOutlined />
-  }
-];
+
 
 const tifFileNames = [
   '1.tiff', '2.tiff', '3.tiff', '4.tiff', '5.tiff',
@@ -183,6 +80,114 @@ const loadTifImage = async (filePath) => {
 };
 
 function MedicalRecordScan() {
+  // 默认菜单项（当API调用失败时使用）
+  const defaultMenuItems = [
+    {
+      key: 'overview',
+      label: '总览',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'record-home',
+      label: '病案首页',
+      icon: <FileTextOutlined />
+    },
+    {
+      key: 'admission-record',
+      label: '入院记录',
+      icon: <FileTextOutlined />
+    },
+    {
+      key: 'discharge-related',
+      label: '出院相关记录',
+      icon: <FolderOutlined />,
+      children: [
+        { 
+          key: 'discharge-death', 
+          label: '出院（死亡）记录', 
+          icon: <FilePdfOutlined /> 
+        },
+        { 
+          key: 'health-education', 
+          label: '患者健康教育处方', 
+          icon: <FilePdfOutlined /> 
+        },
+        { 
+          key: 'discharge-certificate', 
+          label: '出院医疗证明', 
+          icon: <FilePdfOutlined /> 
+        }
+      ]
+    },
+    {
+      key: 'progress-note',
+      label: '病程记录',
+      icon: <FolderOutlined />,
+      children: [
+        { 
+          key: 'discharge-discussion', 
+          label: '出院（死亡）讨论', 
+          icon: <FilePdfOutlined /> 
+        }
+      ]
+    },
+    {
+      key: 'consultation-record',
+      label: '知情谈话记录',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'surgery-related',
+      label: '手术相关记录与资料',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'approval-sheet',
+      label: '审批单',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'consultation-sheet',
+      label: '会诊单',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'specialist-assessment',
+      label: '专科评估记录单',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'difficult-case',
+      label: '疑难病历讨论',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'lab-report',
+      label: '检查检验报告',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'temperature-sheet',
+      label: '体温单',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'doctor-order',
+      label: '医嘱单',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'nursing-record',
+      label: '护理记录',
+      icon: <FolderOutlined />
+    },
+    {
+      key: 'other-related',
+      label: '其他相关资料',
+      icon: <FolderOutlined />
+    }
+  ];
+
   const [barcode, setBarcode] = useState('');
   const [selectedMenu, setSelectedMenu] = useState('overview');
   const [expandedMenus, setExpandedMenus] = useState(['discharge-related', 'progress-note']);
@@ -191,6 +196,94 @@ function MedicalRecordScan() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [previewImage, setPreviewImage] = useState(null);
+  // 新增状态：菜单数据
+  const [menuItems, setMenuItems] = useState(defaultMenuItems);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [menuError, setMenuError] = useState(null);
+
+  // 获取菜单数据的effect
+  useEffect(() => {
+    const fetchMenuData = async () => {
+      setMenuLoading(true);
+      setMenuError(null);
+      
+      try {
+        // 尝试调用真实API获取菜单数据
+        console.log('正在获取菜单数据...');
+        const data = await getMedicalRecordMenu();
+        
+        if (data && data.menuItems) {
+          // 将API返回的菜单数据转换为Ant Design Menu需要的格式
+          const formattedMenuItems = formatMenuItems(data.menuItems);
+          setMenuItems(formattedMenuItems);
+          console.log('菜单数据获取成功', formattedMenuItems.length, '项');
+        } else {
+          // API返回数据格式不正确，使用默认数据
+          console.warn('API返回数据格式不正确，使用默认菜单数据');
+          setMenuItems(defaultMenuItems);
+          setMenuError('API返回数据格式不正确');
+        }
+      } catch (error) {
+        console.warn('获取菜单数据失败，使用默认数据:', error.message);
+        setMenuItems(defaultMenuItems);
+        setMenuError(`获取菜单失败: ${error.message}`);
+        
+        // 可以尝试使用模拟数据（用于开发测试）
+        try {
+          const mockData = await getMockMedicalRecordMenu();
+          if (mockData && mockData.menuItems) {
+            const formattedMenuItems = formatMenuItems(mockData.menuItems);
+            setMenuItems(formattedMenuItems);
+            console.log('使用模拟菜单数据', formattedMenuItems.length, '项');
+            setMenuError(null);
+          }
+        } catch (mockError) {
+          console.error('连模拟数据也失败:', mockError);
+        }
+      } finally {
+        setMenuLoading(false);
+      }
+    };
+
+    fetchMenuData();
+  }, []);
+
+  // 格式化菜单项，将icon字符串转换为React组件
+  const formatMenuItems = (items) => {
+    if (!items || !Array.isArray(items)) {
+      return defaultMenuItems;
+    }
+    
+    return items.map(item => {
+      const formattedItem = { ...item };
+      
+      // 转换icon字符串为React组件
+      if (item.icon) {
+        switch (item.icon) {
+          case 'folder':
+            formattedItem.icon = <FolderOutlined />;
+            break;
+          case 'file-text':
+            formattedItem.icon = <FileTextOutlined />;
+            break;
+          case 'file-pdf':
+            formattedItem.icon = <FilePdfOutlined />;
+            break;
+          default:
+            formattedItem.icon = <FolderOutlined />;
+        }
+      } else {
+        formattedItem.icon = <FolderOutlined />;
+      }
+      
+      // 递归处理子菜单
+      if (item.children && Array.isArray(item.children)) {
+        formattedItem.children = formatMenuItems(item.children);
+      }
+      
+      return formattedItem;
+    });
+  };
 
   const selectedCount = documents.filter(doc => doc.isSelected).length;
   const classifiedCount = documents.filter(doc => doc.isClassified).length;
@@ -334,6 +427,50 @@ function MedicalRecordScan() {
       console.error('加载静态图片失败:', error);
       setIsScanning(false);
       message.error('加载静态图片失败，请检查图片文件');
+    }
+  };
+
+  // 重试获取菜单数据
+  const handleRetryMenu = async () => {
+    setMenuLoading(true);
+    setMenuError(null);
+    
+    try {
+      console.log('重试获取菜单数据...');
+      const data = await getMedicalRecordMenu();
+      
+      if (data && data.menuItems) {
+        const formattedMenuItems = formatMenuItems(data.menuItems);
+        setMenuItems(formattedMenuItems);
+        console.log('菜单数据重试成功', formattedMenuItems.length, '项');
+        message.success('菜单加载成功');
+      } else {
+        console.warn('API返回数据格式不正确，使用默认菜单数据');
+        setMenuItems(defaultMenuItems);
+        setMenuError('API返回数据格式不正确');
+        message.warning('菜单数据格式错误，使用默认菜单');
+      }
+    } catch (error) {
+      console.warn('重试获取菜单数据失败，使用默认数据:', error.message);
+      setMenuItems(defaultMenuItems);
+      setMenuError(`获取菜单失败: ${error.message}`);
+      message.warning('菜单加载失败，使用默认菜单');
+      
+      // 尝试使用模拟数据
+      try {
+        const mockData = await getMockMedicalRecordMenu();
+        if (mockData && mockData.menuItems) {
+          const formattedMenuItems = formatMenuItems(mockData.menuItems);
+          setMenuItems(formattedMenuItems);
+          console.log('使用模拟菜单数据', formattedMenuItems.length, '项');
+          setMenuError(null);
+          message.info('使用模拟菜单数据');
+        }
+      } catch (mockError) {
+        console.error('连模拟数据也失败:', mockError);
+      }
+    } finally {
+      setMenuLoading(false);
     }
   };
 
@@ -548,15 +685,38 @@ function MedicalRecordScan() {
 
       <Layout className="main-content">
         <Sider width={260} className="left-sidebar">
-          <Menu
-            mode="inline"
-            selectedKeys={[selectedMenu]}
-            openKeys={expandedMenus}
-            onOpenChange={handleMenuOpenChange}
-            onClick={handleMenuClick}
-            items={menuItems}
-            expandIcon={({ isOpen }) => isOpen ? <DownOutlined /> : <RightOutlined />}
-          />
+          {menuLoading ? (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              <Spin size="large" tip="加载菜单中..." />
+            </div>
+          ) : menuError ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#ff4d4f' }}>
+              <div style={{ marginBottom: '8px' }}>
+                <span style={{ fontSize: '16px' }}>⚠️</span>
+              </div>
+              <div style={{ fontSize: '14px', marginBottom: '8px' }}>菜单加载失败</div>
+              <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>{menuError}</div>
+              <div style={{ fontSize: '12px', color: '#999', marginBottom: '12px' }}>已使用默认菜单</div>
+              <Button 
+                type="primary" 
+                size="small"
+                onClick={handleRetryMenu}
+                style={{ marginTop: '8px' }}
+              >
+                重试
+              </Button>
+            </div>
+          ) : (
+            <Menu
+              mode="inline"
+              selectedKeys={[selectedMenu]}
+              openKeys={expandedMenus}
+              onOpenChange={handleMenuOpenChange}
+              onClick={handleMenuClick}
+              items={menuItems}
+              expandIcon={({ isOpen }) => isOpen ? <DownOutlined /> : <RightOutlined />}
+            />
+          )}
         </Sider>
 
         <Content className="document-area">
