@@ -200,6 +200,9 @@ function MedicalRecordScan() {
   const [menuItems, setMenuItems] = useState(defaultMenuItems);
   const [menuLoading, setMenuLoading] = useState(true);
   const [menuError, setMenuError] = useState(null);
+  // 拖拽排序状态
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   // 获取菜单数据的effect
   useEffect(() => {
@@ -288,6 +291,74 @@ function MedicalRecordScan() {
   const selectedCount = documents.filter(doc => doc.isSelected).length;
   const classifiedCount = documents.filter(doc => doc.isClassified).length;
   const unclassifiedCount = documents.length - classifiedCount;
+
+  // 拖拽排序处理函数
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index);
+    // 添加拖拽中的样式
+    setTimeout(() => {
+      const draggedElement = e.target.closest('.document-card');
+      if (draggedElement) {
+        draggedElement.classList.add('dragging');
+      }
+    }, 0);
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragEnter = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    // 检查是否离开到子元素
+    const relatedTarget = e.relatedTarget;
+    if (!e.currentTarget.contains(relatedTarget)) {
+      setDragOverIndex(null);
+    }
+  };
+
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    // 重新排序文档
+    const newDocuments = [...documents];
+    const draggedItem = newDocuments[draggedIndex];
+    newDocuments.splice(draggedIndex, 1);
+    newDocuments.splice(dropIndex, 0, draggedItem);
+
+    setDocuments(newDocuments);
+    message.success(`已将图片移动到第 ${dropIndex + 1} 位`);
+
+    handleDragEnd();
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    // 移除所有拖拽样式
+    document.querySelectorAll('.document-card.dragging').forEach(el => {
+      el.classList.remove('dragging');
+    });
+    document.querySelectorAll('.document-card.drag-over').forEach(el => {
+      el.classList.remove('drag-over');
+    });
+  };
 
   const handleMenuOpenChange = (keys) => {
     setExpandedMenus(keys);
@@ -406,6 +477,7 @@ function MedicalRecordScan() {
           ...prevDocs,
           {
             key: `tif-${i}`,
+            order: prevDocs.length + 1,
             category: category,
             image: imageUrl,
             fullImage: imageUrl,
@@ -492,6 +564,7 @@ function MedicalRecordScan() {
 
       const newDocument = {
         key: `tif-insert-${Date.now()}`,
+        order: newDocuments.length + 1,
         category: '插入页面',
         image: imageUrl,
         fullImage: imageUrl,
@@ -728,10 +801,17 @@ function MedicalRecordScan() {
           </div>
           
           <div className="document-grid">
-            {documents.map(doc => (
-              <div 
+            {documents.map((doc, index) => (
+              <div
                 key={doc.key}
-                className={`document-card ${doc.isSelected ? 'selected' : ''} ${doc.isClassified ? 'classified' : ''}`}
+                className={`document-card ${doc.isSelected ? 'selected' : ''} ${doc.isClassified ? 'classified' : ''} ${draggedIndex === index ? 'dragging' : ''} ${dragOverIndex === index ? 'drag-over' : ''}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnter={(e) => handleDragEnter(e, index)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
               >
                 <div className="card-header">
                   <Checkbox
@@ -742,7 +822,7 @@ function MedicalRecordScan() {
                     }}
                     className="doc-checkbox"
                   />
-                  <span 
+                  <span
                     className="card-close-btn"
                     onClick={(e) => {
                       e.stopPropagation();

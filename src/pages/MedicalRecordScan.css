@@ -182,9 +182,38 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
+.document-card:hover {
+  cursor: grab;
+}
+
 .document-card.selected {
   border-color: #1890ff;
   background-color: #e6f7ff;
+}
+
+/* 拖拽排序样式 */
+.document-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  cursor: grabbing;
+}
+
+.document-card.drag-over {
+  border-color: #52c41a;
+  border-style: dashed;
+  background-color: #f6ffed;
+  transform: scale(1.02);
+}
+
+.document-card.drag-over::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: #52c41a;
+  border-radius: 2px;
 }
 
 .document-card.classified {
