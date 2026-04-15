@@ -213,16 +213,17 @@ function MedicalRecordScan() {
       try {
         // 尝试调用真实API获取菜单数据
         console.log('正在获取菜单数据...');
-        const data = await getMedicalRecordMenu();
+        const response = await getMedicalRecordMenu();
         
-        if (data && data.menuItems) {
+        // API返回格式：{ code: 200, body: [...] }
+        if (response && response.code === 200 && Array.isArray(response.body)) {
           // 将API返回的菜单数据转换为Ant Design Menu需要的格式
-          const formattedMenuItems = formatMenuItems(data.menuItems);
+          const formattedMenuItems = formatMenuItems(response.body);
           setMenuItems(formattedMenuItems);
           console.log('菜单数据获取成功', formattedMenuItems.length, '项');
         } else {
           // API返回数据格式不正确，使用默认数据
-          console.warn('API返回数据格式不正确，使用默认菜单数据');
+          console.warn('API返回数据格式不正确，使用默认菜单数据', response);
           setMenuItems(defaultMenuItems);
           setMenuError('API返回数据格式不正确');
         }
@@ -234,8 +235,17 @@ function MedicalRecordScan() {
         // 可以尝试使用模拟数据（用于开发测试）
         try {
           const mockData = await getMockMedicalRecordMenu();
-          if (mockData && mockData.menuItems) {
-            const formattedMenuItems = formatMenuItems(mockData.menuItems);
+          let itemsToFormat;
+          
+          // 模拟数据有两种格式：新格式 { code: 200, body: [...] } 或旧格式 { menuItems: [...] }
+          if (mockData && mockData.code === 200 && Array.isArray(mockData.body)) {
+            itemsToFormat = mockData.body;
+          } else if (mockData && mockData.menuItems && Array.isArray(mockData.menuItems)) {
+            itemsToFormat = mockData.menuItems;
+          }
+          
+          if (itemsToFormat) {
+            const formattedMenuItems = formatMenuItems(itemsToFormat);
             setMenuItems(formattedMenuItems);
             console.log('使用模拟菜单数据', formattedMenuItems.length, '项');
             setMenuError(null);
@@ -251,36 +261,41 @@ function MedicalRecordScan() {
     fetchMenuData();
   }, []);
 
-  // 格式化菜单项，将icon字符串转换为React组件
+  // 格式化菜单项，将API返回的数据转换为Ant Design Menu需要的格式
   const formatMenuItems = (items) => {
     if (!items || !Array.isArray(items)) {
       return defaultMenuItems;
     }
     
     return items.map(item => {
-      const formattedItem = { ...item };
+      // 根据API返回的字段名映射
+      const key = item.medicalRecordArchiveTpId || item.id || item.key;
+      const label = item.name || item.label || '未命名';
+      const code = item.code || '';
       
-      // 转换icon字符串为React组件
-      if (item.icon) {
-        switch (item.icon) {
-          case 'folder':
-            formattedItem.icon = <FolderOutlined />;
-            break;
-          case 'file-text':
-            formattedItem.icon = <FileTextOutlined />;
-            break;
-          case 'file-pdf':
-            formattedItem.icon = <FilePdfOutlined />;
-            break;
-          default:
-            formattedItem.icon = <FolderOutlined />;
-        }
+      // 根据code值确定图标类型
+      let iconType;
+      if (code === '-1' || code === '0' || code.startsWith('F')) {
+        // -1或0开头或F开头可能是文件夹
+        iconType = 'folder';
+      } else if (parseInt(code) > 0) {
+        // 正数可能是文件
+        iconType = 'file-text';
       } else {
-        formattedItem.icon = <FolderOutlined />;
+        iconType = 'folder';
       }
       
+      // 构建格式化后的菜单项
+      const formattedItem = {
+        key: key,
+        label: label,
+        icon: iconType === 'folder' ? <FolderOutlined /> : <FileTextOutlined />,
+        // 保留原始数据，方便调试
+        original: item
+      };
+      
       // 递归处理子菜单
-      if (item.children && Array.isArray(item.children)) {
+      if (item.children && Array.isArray(item.children) && item.children.length > 0) {
         formattedItem.children = formatMenuItems(item.children);
       }
       
@@ -507,21 +522,22 @@ function MedicalRecordScan() {
     setMenuLoading(true);
     setMenuError(null);
     
-    try {
-      console.log('重试获取菜单数据...');
-      const data = await getMedicalRecordMenu();
-      
-      if (data && data.menuItems) {
-        const formattedMenuItems = formatMenuItems(data.menuItems);
-        setMenuItems(formattedMenuItems);
-        console.log('菜单数据重试成功', formattedMenuItems.length, '项');
-        message.success('菜单加载成功');
-      } else {
-        console.warn('API返回数据格式不正确，使用默认菜单数据');
-        setMenuItems(defaultMenuItems);
-        setMenuError('API返回数据格式不正确');
-        message.warning('菜单数据格式错误，使用默认菜单');
-      }
+      try {
+        console.log('重试获取菜单数据...');
+        const response = await getMedicalRecordMenu();
+        
+        // API返回格式：{ code: 200, body: [...] }
+        if (response && response.code === 200 && Array.isArray(response.body)) {
+          const formattedMenuItems = formatMenuItems(response.body);
+          setMenuItems(formattedMenuItems);
+          console.log('菜单数据重试成功', formattedMenuItems.length, '项');
+          message.success('菜单加载成功');
+        } else {
+          console.warn('API返回数据格式不正确，使用默认菜单数据', response);
+          setMenuItems(defaultMenuItems);
+          setMenuError('API返回数据格式不正确');
+          message.warning('菜单数据格式错误，使用默认菜单');
+        }
     } catch (error) {
       console.warn('重试获取菜单数据失败，使用默认数据:', error.message);
       setMenuItems(defaultMenuItems);
@@ -531,8 +547,17 @@ function MedicalRecordScan() {
       // 尝试使用模拟数据
       try {
         const mockData = await getMockMedicalRecordMenu();
-        if (mockData && mockData.menuItems) {
-          const formattedMenuItems = formatMenuItems(mockData.menuItems);
+        let itemsToFormat;
+        
+        // 模拟数据有两种格式：新格式 { code: 200, body: [...] } 或旧格式 { menuItems: [...] }
+        if (mockData && mockData.code === 200 && Array.isArray(mockData.body)) {
+          itemsToFormat = mockData.body;
+        } else if (mockData && mockData.menuItems && Array.isArray(mockData.menuItems)) {
+          itemsToFormat = mockData.menuItems;
+        }
+        
+        if (itemsToFormat) {
+          const formattedMenuItems = formatMenuItems(itemsToFormat);
           setMenuItems(formattedMenuItems);
           console.log('使用模拟菜单数据', formattedMenuItems.length, '项');
           setMenuError(null);

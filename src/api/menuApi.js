@@ -37,116 +37,137 @@ export function getMedicalRecordMenuV2(params = {}) {
 /**
  * 获取菜单数据的模拟函数（用于开发/测试）
  * 当真实API不可用时使用此模拟数据
+ * 返回格式: { code: 200, body: [...] } 兼容实际API格式
  */
 export async function getMockMedicalRecordMenu() {
-  // 返回与当前写死的menuItems相同格式的模拟数据
   return new Promise(resolve => {
     setTimeout(() => {
       resolve({
-        menuItems: [
+        code: 200,
+        body: [
           {
-            key: 'overview',
-            label: '总览',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204502',
+            code: '-1',
+            name: '未编制目录',
+            serialNumber: -1
           },
           {
-            key: 'record-home',
-            label: '病案首页',
-            icon: 'file-text'
+            medicalRecordArchiveTpId: '7204503',
+            code: '1',
+            name: '病案首页',
+            serialNumber: 1
           },
           {
-            key: 'admission-record',
-            label: '入院记录',
-            icon: 'file-text'
+            medicalRecordArchiveTpId: '7204504',
+            code: '2',
+            name: '入院记录',
+            serialNumber: 2
           },
           {
-            key: 'discharge-related',
-            label: '出院相关记录',
-            icon: 'folder',
+            medicalRecordArchiveTpId: '7204505',
+            code: '3',
+            name: '出院相关记录',
+            serialNumber: 3,
             children: [
               { 
-                key: 'discharge-death', 
-                label: '出院（死亡）记录', 
-                icon: 'file-pdf'
+                medicalRecordArchiveTpId: '7204505-1',
+                code: '3.1',
+                name: '出院（死亡）记录',
+                serialNumber: 31
               },
               { 
-                key: 'health-education', 
-                label: '患者健康教育处方', 
-                icon: 'file-pdf'
+                medicalRecordArchiveTpId: '7204505-2',
+                code: '3.2',
+                name: '患者健康教育处方',
+                serialNumber: 32
               },
               { 
-                key: 'discharge-certificate', 
-                label: '出院医疗证明', 
-                icon: 'file-pdf'
+                medicalRecordArchiveTpId: '7204505-3',
+                code: '3.3',
+                name: '出院医疗证明',
+                serialNumber: 33
               }
             ]
           },
           {
-            key: 'progress-note',
-            label: '病程记录',
-            icon: 'folder',
+            medicalRecordArchiveTpId: '7204506',
+            code: '4',
+            name: '病程记录',
+            serialNumber: 4,
             children: [
               { 
-                key: 'discharge-discussion', 
-                label: '出院（死亡）讨论', 
-                icon: 'file-pdf'
+                medicalRecordArchiveTpId: '7204506-1',
+                code: '4.1',
+                name: '出院（死亡）讨论',
+                serialNumber: 41
               }
             ]
           },
           {
-            key: 'consultation-record',
-            label: '知情谈话记录',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204507',
+            code: '5',
+            name: '知情谈话记录',
+            serialNumber: 5
           },
           {
-            key: 'surgery-related',
-            label: '手术相关记录与资料',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204508',
+            code: '6',
+            name: '手术相关记录与资料',
+            serialNumber: 6
           },
           {
-            key: 'approval-sheet',
-            label: '审批单',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204509',
+            code: '7',
+            name: '审批单',
+            serialNumber: 7
           },
           {
-            key: 'consultation-sheet',
-            label: '会诊单',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204510',
+            code: '8',
+            name: '会诊单',
+            serialNumber: 8
           },
           {
-            key: 'specialist-assessment',
-            label: '专科评估记录单',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204511',
+            code: '9',
+            name: '专科评估记录单',
+            serialNumber: 9
           },
           {
-            key: 'difficult-case',
-            label: '疑难病历讨论',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204512',
+            code: '10',
+            name: '疑难病历讨论',
+            serialNumber: 10
           },
           {
-            key: 'lab-report',
-            label: '检查检验报告',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204513',
+            code: '11',
+            name: '检查检验报告',
+            serialNumber: 11
           },
           {
-            key: 'temperature-sheet',
-            label: '体温单',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204514',
+            code: '12',
+            name: '体温单',
+            serialNumber: 12
           },
           {
-            key: 'doctor-order',
-            label: '医嘱单',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204515',
+            code: '13',
+            name: '医嘱单',
+            serialNumber: 13
           },
           {
-            key: 'nursing-record',
-            label: '护理记录',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204516',
+            code: '14',
+            name: '护理记录',
+            serialNumber: 14
           },
           {
-            key: 'other-related',
-            label: '其他相关资料',
-            icon: 'folder'
+            medicalRecordArchiveTpId: '7204517',
+            code: '15',
+            name: '其他相关资料',
+            serialNumber: 15
           }
         ]
       });
