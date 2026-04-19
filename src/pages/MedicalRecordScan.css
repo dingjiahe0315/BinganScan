@@ -180,9 +180,6 @@
 
 .document-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.document-card:hover {
   cursor: grab;
 }
 
@@ -428,12 +425,4 @@
   padding: 1px 6px;
   border-radius: 10px;
   z-index: 1;
-}
-
-/* 菜单项提示文本 */
-.menu-item-tooltip {
-  font-size: 12px;
-  color: #666;
-  display: block;
-  margin-top: 4px;
 }

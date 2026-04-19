@@ -27,17 +27,10 @@ const { Content, Sider } = Layout;
 
 /**
  * 将Blob格式的图片转换为DataURL
- * 
- * 功能描述：
- * 1. 接收Blob、ArrayBuffer或base64格式的图片数据
- * 2. 根据图片格式（TIF/TIFF或其他）进行不同处理
- * 3. TIF/TIFF格式使用UTIF库转换为JPEG DataURL
- * 4. 其他格式（JPEG/PNG等）直接转换为DataURL
- * 
- * @param {Blob|ArrayBuffer|string} blobData - Blob、ArrayBuffer或base64格式的图片数据
+ * @param {Blob|ArrayBuffer|string} blobData - 图片数据
  * @param {string} fileName - 文件名，用于判断图片格式
  * @param {string} mimeType - MIME类型（可选）
- * @returns {string|null} DataURL格式的图片数据，转换失败返回null
+ * @returns {string|null} DataURL格式的图片数据
  */
 const convertBlobToImage = async (blobData, fileName, mimeType = 'image/jpeg') => {
   try {
@@ -67,24 +60,10 @@ const convertBlobToImage = async (blobData, fileName, mimeType = 'image/jpeg') =
       if (ifds && ifds.length > 0) {
         const ifd = ifds[0];
         
-        // UTIF库使用TIFF标签编号作为字段名
-        // t256 = ImageWidth (图像宽度)
-        // t257 = ImageLength (图像高度)
-        // 这些字段是数组，需要取第一个元素
         const width = ifd.t256?.[0] || ifd.tifw || ifd.width;
         const height = ifd.t257?.[0] || ifd.tifh || ifd.height;
         
-        console.log('TIF解析结果:', {
-          ifdCount: ifds.length,
-          width: width,
-          height: height,
-          t256: ifd.t256,
-          t257: ifd.t257,
-          t274: ifd.t274
-        });
-        
         if (!width || !height) {
-          console.error('无法获取图片尺寸，IFD对象:', ifd);
           throw new Error('无法获取TIF图片尺寸');
         }
         
@@ -97,22 +76,11 @@ const convertBlobToImage = async (blobData, fileName, mimeType = 'image/jpeg') =
         
         const rgba = UTIF.toRGBA8(ifd);
         
-        console.log('RGBA数据:', {
-          length: rgba?.length,
-          expectedLength: width * height * 4
-        });
-        
         const imageData = ctx.createImageData(width, height);
         imageData.data.set(rgba);
         ctx.putImageData(imageData, 0, 0);
         
-        console.log('Canvas尺寸:', canvas.width, 'x', canvas.height);
-        
-        // 转换为JPEG DataURL
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-        console.log('DataURL生成成功，长度:', dataUrl.length);
-        
-        return dataUrl;
+        return canvas.toDataURL('image/jpeg', 0.92);
       }
       
       throw new Error('无法解析 TIF 文件');
@@ -136,73 +104,45 @@ const convertBlobToImage = async (blobData, fileName, mimeType = 'image/jpeg') =
 
 /**
  * 加载并解析TIF/TIFF格式的图片文件
- * 
- * 功能描述：
- * 1. 使用fetch API获取TIF文件的二进制数据
- * 2. 使用UTIF库解析TIF格式，提取图像数据
- * 3. 将TIF图像数据渲染到Canvas上
- * 4. 对图像进行缩放，以适应显示尺寸要求
- * 5. 将Canvas转换为JPEG格式的Data URL，便于在页面上显示
- * 
- * 技术要点：
- * - UTIF库用于处理TIF/TIFF格式，支持多页、压缩等特性
- * - Canvas API用于图像处理和格式转换
- * - Data URL将二进制图像数据转换为可直接在img标签中使用的字符串
- * 
- * @param {string} filePath - TIF文件的路径（相对路径或绝对路径）
- * @returns {string|null} JPEG格式的Data URL，如果加载失败则返回null
+ * @param {string} filePath - TIF文件的路径
+ * @returns {string|null} JPEG格式的Data URL
  */
 const loadTifImage = async (filePath) => {
   try {
-    // 第一步：获取TIF文件的二进制数据
     const response = await fetch(filePath);
-    const arrayBuffer = await response.arrayBuffer();  // 转换为ArrayBuffer
-    
-    // 第二步：使用UTIF库解析TIF文件
-    // UTIF.decode解析TIF文件，返回IFD（图像文件目录）数组，每个IFD对应一页图像
+    const arrayBuffer = await response.arrayBuffer();
     const ifds = UTIF.decode(arrayBuffer);
     
-    // 检查是否成功解析到图像数据
     if (ifds && ifds.length > 0) {
-      const ifd = ifds[0];  // 取第一页图像（TIF可能包含多页）
-      UTIF.decodeImage(arrayBuffer, ifd);  // 解码图像数据到ifd对象
+      const ifd = ifds[0];
+      UTIF.decodeImage(arrayBuffer, ifd);
       
-      // 第三步：创建Canvas并绘制原始TIF图像
       const canvas = document.createElement('canvas');
-      canvas.width = ifd.width;     // 设置Canvas宽度为图像宽度
-      canvas.height = ifd.height;   // 设置Canvas高度为图像高度
+      canvas.width = ifd.width;
+      canvas.height = ifd.height;
       const ctx = canvas.getContext('2d');
       
-      // 将UTIF解码的RGBA数据转换为Canvas可用的ImageData
-      const rgba = UTIF.toRGBA8(ifd);  // 获取RGBA格式的像素数据（Uint8Array）
-      const imageData = ctx.createImageData(ifd.width, ifd.height);  // 创建ImageData对象
-      imageData.data.set(rgba);  // 将RGBA数据复制到ImageData
-      ctx.putImageData(imageData, 0, 0);  // 将图像绘制到Canvas上
+      const rgba = UTIF.toRGBA8(ifd);
+      const imageData = ctx.createImageData(ifd.width, ifd.height);
+      imageData.data.set(rgba);
+      ctx.putImageData(imageData, 0, 0);
       
-      // 第四步：创建第二个Canvas进行图像缩放
-      // 为了优化显示性能，将图像缩放到适合预览的尺寸
       const resizeCanvas = document.createElement('canvas');
-      const maxWidth = 400;   // 最大宽度限制
-      const maxHeight = 560;  // 最大高度限制
+      const maxWidth = 400;
+      const maxHeight = 560;
       
-      // 计算缩放比例：保持宽高比，不超过最大尺寸，且不放大（ratio ≤ 1）
       let ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height, 1);
-      resizeCanvas.width = Math.floor(canvas.width * ratio);   // 计算缩放后宽度
-      resizeCanvas.height = Math.floor(canvas.height * ratio); // 计算缩放后高度
+      resizeCanvas.width = Math.floor(canvas.width * ratio);
+      resizeCanvas.height = Math.floor(canvas.height * ratio);
       
-      // 在缩放Canvas上绘制已缩放的图像
       const resizeCtx = resizeCanvas.getContext('2d');
       resizeCtx.drawImage(canvas, 0, 0, resizeCanvas.width, resizeCanvas.height);
       
-      // 第五步：将Canvas转换为JPEG格式的Data URL并返回
-      // toDataURL参数说明：'image/jpeg'指定格式，0.85指定JPEG压缩质量（0-1）
       return resizeCanvas.toDataURL('image/jpeg', 0.85);
     }
     
-    // 如果没有解析到图像数据，抛出错误
     throw new Error('无法解析 TIF 文件');
   } catch (error) {
-    // 错误处理：记录错误日志，返回null表示加载失败
     console.error('加载 TIF 图片失败:', error);
     return null;
   }
@@ -218,7 +158,6 @@ const loadTifImage = async (filePath) => {
  * 4. 集成WebSocket扫描和静态图片加载
  */
 function MedicalRecordScan() {
-
 
   const [barcode, setBarcode] = useState('');
   const [selectedMenu, setSelectedMenu] = useState('overview');
@@ -245,63 +184,39 @@ function MedicalRecordScan() {
   const [selectedMenuKey, setSelectedMenuKey] = useState(null);
 
   /**
-   * 获取菜单数据的Effect Hook
-   * 
-   * 功能描述：
-   * 1. 组件挂载时自动调用，获取左侧菜单栏数据
-   * 2. 尝试调用真实API获取数据，支持多种数据格式
-   * 3. 实现错误处理：真实API失败时使用默认数据并禁用扫描功能
-   * 4. 管理加载状态和错误状态，提供良好的用户体验
-   * 
-   * 数据源优先级：
-   * 1. 真实API（getMedicalRecordMenu） - 生产环境首选
-   * 2. 失败时返回空数据 - API失败时显示未获取到数据
-   * 
-   * 扫描功能控制：
-   * - 真实API成功：启用扫描功能
-   * - 真实API失败或数据格式不正确：禁用扫描功能
-   * 
-   * 依赖项：[] 空数组表示只在组件挂载时执行一次
+   * 获取菜单数据
    */
   useEffect(() => {
     const fetchMenuData = async () => {
-      // 初始化状态：开始加载，清除之前的错误
       setMenuLoading(true);
       setMenuError(null);
       
       try {
-        // ==================== 第一步：尝试调用真实API ====================
-        // 调用真实API获取菜单数据
         const response = await getMedicalRecordMenu();
         
         if (response && response.success && Array.isArray(response.data)) {
-          // 成功获取数据：存储原始数据并格式化
           setRawMenuData(response.data);
           const formattedMenuItems = formatMenuItems(response.data);
           setMenuItems(formattedMenuItems);
-          setScanEnabled(true);  // 启用扫描功能
+          setScanEnabled(true);
         } else {
-          // API返回数据格式不正确：返回空数据并禁用扫描功能
-          console.warn('API返回数据格式不正确，返回空数据', response);
+          console.warn('API返回数据格式不正确', response);
           setMenuItems([]);
           setMenuError('API返回数据格式不正确');
-          setScanEnabled(false); // 禁用扫描功能
+          setScanEnabled(false);
         }
       } catch (error) {
-        // ==================== 第二步：真实API失败，返回空数据并禁用扫描功能 ====================
-        console.warn('获取菜单数据失败，返回空数据:', error.message);
+        console.warn('获取菜单数据失败:', error.message);
         setMenuItems([]);
         setMenuError(`获取菜单失败: ${error.message}`);
-        setScanEnabled(false); // 禁用扫描功能
+        setScanEnabled(false);
       } finally {
-        // ==================== 第四步：无论成功与否，结束加载状态 ====================
         setMenuLoading(false);
       }
     };
 
-    // 执行数据获取函数
     fetchMenuData();
-  }, []);  // 空依赖数组：只在组件挂载时执行一次
+  }, []);
 
   /**
    * 当文档状态改变时，重新格式化菜单项以更新绑定状态样式
@@ -316,64 +231,22 @@ function MedicalRecordScan() {
 
 
   /**
-   * 格式化菜单项，将API返回的数据转换为Ant Design Menu需要的格式
-   * 
-   * 功能描述：
-   * 1. 数据验证：验证输入是否为有效数组
-   * 2. 字段映射：将API字段映射为Ant Design Menu要求的字段（key, label, icon, children）
-   * 3. 标签生成：直接使用name字段作为显示标签
-   * 4. 图标选择：根据节点是否包含children属性决定使用文件夹图标还是文件图标
-   * 5. 递归处理：根据children字段递归格式化所有子菜单项
-   * 6. 排序：按照serialNumber或code对菜单项进行排序
-   * 
-   * 数据处理流程：
-   * 1. 输入验证 → 2. 字段映射和格式化 → 3. 递归处理子节点 → 4. 排序 → 5. 返回结果
-   * 
-   * 关键说明：
-   * - 后端返回的数据已经是树形结构，children字段包含子节点数据
-   * - parentId字段无需处理，直接忽略
-   * - code字段是一个类似于ID的标识符，仅用于排序，不用于标签生成
-   * - 区分文件夹和文件的正确方式是：检查节点是否包含children属性（无论是否为空数组）
-   *   - 有children属性的节点视为文件夹（使用FolderOutlined图标）
-   *   - 没有children属性的节点视为文件（使用FileTextOutlined图标）
-   * - 标签生成逻辑：直接使用name字段作为显示标签
-   * - 排序逻辑：优先使用serialNumber字段，其次尝试将code解析为数字进行排序
-   * 
-   * 注意事项：
-   * - 空数组处理：输入为空数组时，直接返回空数组
-   * - 字段兼容性：支持多种ID字段名（medicalRecordArchiveTpId > id > key）
-   * - 错误处理：任何处理失败时，返回空数组
-   * 
-   * @param {Array} items - API返回的菜单项数组，应为树形结构（包含children字段）
-   * @returns {Array} 格式化后的菜单项数组，符合Ant Design Menu组件要求
+   * 格式化菜单项数据为Ant Design Menu格式
+   * @param {Array} items - 菜单项数组
+   * @returns {Array} 格式化后的菜单项数组
    */
   const formatMenuItems = (items) => {
-    // 参数验证：确保输入是有效的数组
-    if (!items || !Array.isArray(items)) {
-      return [];  // 返回空数组
-    }
-    
-    // 空数组处理：如果输入为空数组，直接返回空数组
-    if (items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return [];
     }
     
-    // 直接使用items进行格式化：后端返回的数据已经是树形结构，children字段包含子节点数据
-    // parentId字段无需处理，直接忽略
-    const itemsToFormat = items;  // 待格式化的数据
-    
-    // 格式化每个菜单项：将API数据结构转换为Ant Design Menu数据结构
-    const formattedItems = itemsToFormat.map(item => {
-      // 字段映射：API返回的字段名可能不同，统一映射为标准字段
-      // 关键修复：使用code作为key，确保拖拽绑定和点击过滤使用同一个标识符
+    const formattedItems = items.map(item => {
       const code = String(item.code || item.medicalRecordArchiveTpId || item.id || item.key);
-      const key = code;  // key必须等于code，保证绑定和过滤一致
-      const name = item.name || item.label || '未命名';                 // 显示名称
+      const key = code;
+      const name = item.name || item.label || '未命名';
       
-      // 获取该菜单项绑定的图片数量
       const boundCount = getBoundCountForMenu(code);
       
-      // 生成显示标签：使用class区分已绑定和未绑定状态
       let label = (
         <div 
           className={`menu-drop-zone ${boundCount > 0 ? 'menu-item-bound' : ''}`}
@@ -382,7 +255,6 @@ function MedicalRecordScan() {
           onDragLeave={handleMenuDragLeave}
           onDrop={(e) => {
             e.stopPropagation();
-            // 绑定和过滤都使用code（即key）
             handleMenuDrop(e, key, code);
           }}
           onDragEnd={handleMenuDragEnd}
@@ -391,29 +263,23 @@ function MedicalRecordScan() {
         </div>
       );
       
-      // 处理子菜单：如果存在children属性且为数组，则递归格式化
       let children = null;
       const hasChildrenProperty = item.children !== undefined && Array.isArray(item.children);
       
       if (hasChildrenProperty) {
-        // 递归格式化子节点，即使item.children为空数组也会处理
         children = formatMenuItems(item.children);
       }
       
-      // 根据是否包含children属性确定图标类型
-      // 规则：有children属性的节点视为文件夹，没有children属性的节点视为文件
       const icon = hasChildrenProperty ? <FolderOutlined /> : <FileTextOutlined />;
       
-      // 构建格式化后的菜单项，符合Ant Design Menu组件要求
       const formattedItem = {
-        key: key,           // 菜单项的唯一标识（等于code）
-        label: label,       // 菜单项显示文本
+        key: key,
+        label: label,
         icon: icon,
-        menuCode: code,     // 存储菜单项的code值，用于图片绑定过滤
-        className: boundCount > 0 ? 'menu-item-bound' : ''  // 菜单项外层class，用于区分已绑定状态
+        menuCode: code,
+        className: boundCount > 0 ? 'menu-item-bound' : ''
       };
       
-      // 如果有children属性（无论是否为空数组），都添加到格式化后的菜单项中
       if (hasChildrenProperty) {
         formattedItem.children = children;
       }
@@ -421,10 +287,7 @@ function MedicalRecordScan() {
       return formattedItem;
     });
     
-    // 对格式化后的菜单项进行排序（按serialNumber或code）
-    // 排序规则：优先使用serialNumber字段，其次使用code字段
     return formattedItems.sort((a, b) => {
-      // 从原始数据中获取排序字段（因为格式化后的数据可能丢失了原始字段）
       const originalA = items.find(item => 
         String(item.code || item.medicalRecordArchiveTpId || item.id || item.key) === a.key
       );
@@ -432,15 +295,14 @@ function MedicalRecordScan() {
         String(item.code || item.medicalRecordArchiveTpId || item.id || item.key) === b.key
       );
       
-      if (!originalA || !originalB) return 0;  // 如果找不到原始数据，保持原顺序
+      if (!originalA || !originalB) return 0;
       
-      // 优先使用serialNumber，其次使用code
       const aNum = originalA.serialNumber !== undefined ? originalA.serialNumber : 
                   parseInt(originalA.code) || parseFloat(originalA.code) || 0;
       const bNum = originalB.serialNumber !== undefined ? originalB.serialNumber : 
                   parseInt(originalB.code) || parseFloat(originalB.code) || 0;
       
-      return aNum - bNum;  // 升序排序
+      return aNum - bNum;
     });
   };
 
@@ -462,16 +324,11 @@ function MedicalRecordScan() {
    * @param {number} index - 被拖拽元素在文档数组中的索引
    */
   const handleDragStart = (e, index) => {
-    setDraggedIndex(index);                     // 记录被拖拽元素的索引
-    e.dataTransfer.effectAllowed = 'move';      // 设置拖拽操作为移动
-    e.dataTransfer.setData('text/plain', index); // 存储拖拽数据（索引）
-    
-    // 异步添加拖拽样式，确保DOM已更新
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index);
     setTimeout(() => {
-      const draggedElement = e.target.closest('.document-card');
-      if (draggedElement) {
-        draggedElement.classList.add('dragging');  // 添加拖拽中的CSS类
-      }
+      e.target.closest('.document-card')?.classList.add('dragging');
     }, 0);
   };
 
@@ -487,10 +344,8 @@ function MedicalRecordScan() {
    * @param {number} index - 当前悬停元素在文档数组中的索引
    */
   const handleDragOver = (e, index) => {
-    e.preventDefault();                         // 必须调用，否则drop事件不会触发
-    e.dataTransfer.dropEffect = 'move';         // 设置拖拽视觉效果
-    
-    // 如果悬停位置不是被拖拽元素本身，则更新dragOverIndex状态
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     if (draggedIndex !== null && draggedIndex !== index) {
       setDragOverIndex(index);
     }
@@ -507,8 +362,7 @@ function MedicalRecordScan() {
    * @param {number} index - 当前进入元素在文档数组中的索引
    */
   const handleDragEnter = (e, index) => {
-    e.preventDefault();  // 必须调用，否则drop事件不会触发
-    
+    e.preventDefault();
     if (draggedIndex !== null && draggedIndex !== index) {
       setDragOverIndex(index);
     }
@@ -524,11 +378,9 @@ function MedicalRecordScan() {
    * @param {DragEvent} e - HTML5拖拽事件对象
    */
   const handleDragLeave = (e) => {
-    // 检查拖拽是否离开到当前元素的子元素
-    // 如果relatedTarget是当前元素的子元素，说明拖拽仍在当前元素内部
     const relatedTarget = e.relatedTarget;
     if (!e.currentTarget.contains(relatedTarget)) {
-      setDragOverIndex(null);  // 拖拽真正离开了当前元素，清除悬停状态
+      setDragOverIndex(null);
     }
   };
 
@@ -546,24 +398,21 @@ function MedicalRecordScan() {
    * @param {number} dropIndex - 放置位置在文档数组中的索引
    */
   const handleDrop = (e, dropIndex) => {
-    e.preventDefault();  // 必须调用，防止浏览器默认行为
-    
-    // 检查放置位置是否有效：不能是拖拽元素本身，也不能没有拖拽元素
+    e.preventDefault();
     if (draggedIndex === null || draggedIndex === dropIndex) {
-      handleDragEnd();  // 清理拖拽状态
+      handleDragEnd();
       return;
     }
 
-    // 重新排序文档：使用不可变方式更新数组
-    const newDocuments = [...documents];                 // 创建文档数组的副本
-    const draggedItem = newDocuments[draggedIndex];      // 获取被拖拽的元素
-    newDocuments.splice(draggedIndex, 1);                // 从原位置移除
-    newDocuments.splice(dropIndex, 0, draggedItem);      // 插入到新位置
+    const newDocuments = [...documents];
+    const draggedItem = newDocuments[draggedIndex];
+    newDocuments.splice(draggedIndex, 1);
+    newDocuments.splice(dropIndex, 0, draggedItem);
 
-    setDocuments(newDocuments);                          // 更新状态
-    message.success(`已将图片移动到第 ${dropIndex + 1} 位`);  // 用户反馈
+    setDocuments(newDocuments);
+    message.success(`已将图片移动到第 ${dropIndex + 1} 位`);
 
-    handleDragEnd();  // 清理拖拽状态
+    handleDragEnd();
   };
 
   /**
@@ -574,16 +423,10 @@ function MedicalRecordScan() {
    * 2. 移除所有拖拽相关的CSS样式类
    */
   const handleDragEnd = () => {
-    setDraggedIndex(null);    // 清除被拖拽元素索引
-    setDragOverIndex(null);   // 清除悬停元素索引
-    
-    // 移除所有拖拽相关的CSS样式类
-    document.querySelectorAll('.document-card.dragging').forEach(el => {
-      el.classList.remove('dragging');
-    });
-    document.querySelectorAll('.document-card.drag-over').forEach(el => {
-      el.classList.remove('drag-over');
-    });
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    document.querySelectorAll('.document-card.dragging').forEach(el => el.classList.remove('dragging'));
+    document.querySelectorAll('.document-card.drag-over').forEach(el => el.classList.remove('drag-over'));
   };
 
   // ==================== 拖拽绑定菜单处理函数 ====================
@@ -685,7 +528,6 @@ function MedicalRecordScan() {
   };
 
   const handleMenuClick = ({ key }) => {
-    // 检查是否是叶子节点（非文件夹）
     const findMenuItem = (items, targetKey) => {
       for (const menuItem of items) {
         if (menuItem.key === targetKey) return menuItem;
@@ -698,9 +540,7 @@ function MedicalRecordScan() {
     };
     const clickedItem = findMenuItem(menuItems, key);
     
-    // 只有叶子节点（没有children）才设置为选中菜单
     if (clickedItem && !clickedItem.children) {
-      // 使用菜单项的menuCode进行过滤（与handleMenuDrop保持一致）
       const menuCode = clickedItem.menuCode || key;
       setSelectedMenuKey(menuCode);
       setSelectedMenu(key);
@@ -708,25 +548,6 @@ function MedicalRecordScan() {
       setSelectedMenuKey(null);
       setSelectedMenu(key);
     }
-  };
-
-  /**
-   * 根据菜单key获取对应的code值
-   */
-  const getMenuCodeByKey = (menuKey) => {
-    if (!menuKey) return null;
-    const findMenuItem = (items, targetKey) => {
-      for (const item of items) {
-        if (item.key === targetKey) return item;
-        if (item.children) {
-          const found = findMenuItem(item.children, targetKey);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    const foundItem = findMenuItem(menuItems, menuKey);
-    return foundItem?.menuCode || null;
   };
 
   // 过滤文档：根据选中的菜单项显示绑定的图片
