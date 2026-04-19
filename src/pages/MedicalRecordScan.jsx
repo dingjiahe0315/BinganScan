@@ -587,13 +587,65 @@ function MedicalRecordScan() {
   };
 
   /**
+   * 通过WebSocket获取扫描图片
+   * @param {Object} params - 扫描参数
+   * @returns {Array} 图片数据数组 [{blob, fileName}]
+   */
+  const fetchImagesFromWebSocket = (params = {}) => {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket('ws://localhost:8080');
+      ws.binaryType = 'blob';
+
+      ws.onopen = () => {
+        ws.send(`startScan:${JSON.stringify(params)}`);
+      };
+
+      const receivedImages = [];
+      let timeoutId = null;
+      let closeReceived = false;
+
+      ws.onmessage = (event) => {
+        if (typeof event.data === 'string') {
+          const text = event.data.toLowerCase();
+          if (text.includes('completed') || text.includes('finished') || text.includes('done')) {
+            clearTimeout(timeoutId);
+            closeReceived = true;
+            ws.close();
+            resolve(receivedImages);
+          }
+          return;
+        }
+
+        if (event.data instanceof Blob) {
+          receivedImages.push({
+            blob: event.data,
+            fileName: `image-${receivedImages.length}.tiff`
+          });
+        }
+      };
+
+      ws.onclose = () => {
+        closeReceived = true;
+        clearTimeout(timeoutId);
+        resolve(receivedImages);
+      };
+
+      ws.onerror = () => {
+        clearTimeout(timeoutId);
+        reject(new Error('WebSocket连接失败'));
+      };
+
+      timeoutId = setTimeout(() => {
+        if (!closeReceived) {
+          ws.close();
+          reject(new Error('接收图片超时'));
+        }
+      }, 60000);
+    });
+  };
+
+  /**
    * 开始扫描处理函数
-   * 
-   * 功能描述：
-   * 1. 检查是否正在扫描，避免重复操作
-   * 2. 连接WebSocket服务器执行扫描操作
-   * 3. 接收Blob格式的图片数据并转换为可显示的格式
-   * 4. 更新扫描进度和状态
    */
   const handleStartScan = async () => {
     if (isScanning) {
@@ -605,175 +657,79 @@ function MedicalRecordScan() {
     setScanProgress(0);
     message.info('开始扫描...');
 
-    // 尝试连接WebSocket并获取图片数据
     try {
-      // 连接WebSocket服务器
-      const ws = new WebSocket('ws://localhost:8080');
-      
-      // 设置接收二进制数据为Blob格式
-      ws.binaryType = 'blob';
-      
-      // 等待连接建立
-      await new Promise((resolve, reject) => {
-        ws.onopen = () => {
-          console.log('WebSocket连接成功');
-          resolve();
-        };
-        ws.onerror = (error) => {
-          console.error('WebSocket连接错误:', error);
-          reject(new Error('WebSocket连接失败'));
-        };
-        ws.onclose = () => {
-          reject(new Error('WebSocket连接被关闭'));
-        };
-      });
+      const params = {
+        ColorMode: "黑白",
+        Resolution: 600,
+        ShowInterface: false,
+        UseFeeder: true,
+        IsDuplex: true
+      };
 
-      // 发送空参数调用方法，接收Blob格式的图片数据
-      const imagesData = await new Promise((resolve, reject) => {
-        const receivedImages = [];
-        let timeoutId = null;
-        let closeReceived = false;
+      const imagesData = await fetchImagesFromWebSocket(params);
 
-        const messageHandler = (event) => {
-          console.log('收到消息:', event.data);
-          
-          // 处理文本消息 - 检查是否是完成信号
-          if (typeof event.data === 'string') {
-            const text = event.data.toLowerCase();
-            if (text.includes('completed') || text.includes('finished') || text.includes('done')) {
-              console.log(`收到完成信号，已接收 ${receivedImages.length} 张图片`);
-              clearTimeout(timeoutId);
-              closeReceived = true;
-              resolve(receivedImages);
-            }
-            return;
-          }
-          
-          // 直接接收Blob格式的图片数据
-          if (event.data instanceof Blob) {
-            const blob = event.data;
-            const imageIndex = receivedImages.length;
-            const fileName = `image-${imageIndex}.tiff`;
-            
-            receivedImages.push({
-              blob: blob,
-              fileName: fileName
-            });
-            
-            console.log(`已接收图片 ${imageIndex + 1}，大小: ${(blob.size / 1024).toFixed(2)} KB`);
-            
-            // 更新进度（临时显示）
-            setScanProgress(Math.min(90, receivedImages.length * 10));
-          }
-        };
-        
-        ws.onmessage = messageHandler;
-        
-        // 监听连接关闭事件，表示数据传输完成
-        ws.onclose = () => {
-          closeReceived = true;
-          clearTimeout(timeoutId);
-          console.log(`数据传输完成，共接收 ${receivedImages.length} 张图片`);
-          resolve(receivedImages);
-        };
-        
-        ws.onerror = (error) => {
-          clearTimeout(timeoutId);
-          reject(new Error('WebSocket接收图片时发生错误'));
-        };
-        
-        // 设置超时处理（60秒）
-        timeoutId = setTimeout(() => {
-          if (!closeReceived) {
-            ws.close();
-            reject(new Error('接收图片超时'));
-          }
-        }, 60000);
-        
-        // 发送空参数调用方法
-        const params = JSON.stringify({
-          "ColorMode": "黑白",
-          "Resolution": 600,
-          "ShowInterface": false,
-          "UseFeeder": true,
-          "IsDuplex": true
-        });
-        ws.send(`startScan:${params}`);
-      });
+      if (imagesData.length === 0) {
+        message.warning('未获取到扫描图片');
+        setIsScanning(false);
+        return;
+      }
 
       message.info('图片数据接收完成');
 
-      // 使用接收到的图片数据创建文档
-      try {
-        const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
-        
-        for (let i = 0; i < imagesData.length; i++) {
-          const imageData = imagesData[i];
-          const fileName = imageData.fileName || `image-${i}.tiff`;
-          const category = imageData.category || categories[i % categories.length];
+      const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
+
+      for (let i = 0; i < imagesData.length; i++) {
+        const imageData = imagesData[i];
+        const fileName = imageData.fileName || `image-${i}.tiff`;
+        const category = imageData.category || categories[i % categories.length];
+
+        console.log(`开始转换第 ${i + 1} 张图片:`, {
+          fileName,
+          blobSize: imageData.blob.size,
+          blobType: imageData.blob.type
+        });
           
-          console.log(`开始转换第 ${i + 1} 张图片:`, {
-            fileName,
-            blobSize: imageData.blob.size,
-            blobType: imageData.blob.type
-          });
+        // 将Blob转换为可显示的图片URL
+        const imageUrl = await convertBlobToImage(imageData.blob, fileName, 'image/tiff');
           
-          // 将Blob转换为可显示的图片URL
-          const imageUrl = await convertBlobToImage(imageData.blob, fileName, 'image/tiff');
-          
-          console.log(`第 ${i + 1} 张图片转换结果:`, imageUrl ? '成功' : '失败', imageUrl?.substring(0, 50));
-          
-          if (!imageUrl) {
-            console.warn(`第 ${i + 1} 张图片转换失败`);
-            continue;
-          }
-          
-          setDocuments(prevDocs => [
-            ...prevDocs,
-            {
-              key: `ws-${i}-${Date.now()}`,
-              order: prevDocs.length + 1,
-              category: category,
-              image: imageUrl,
-              fullImage: imageUrl,
-              fileName: fileName,
-              isSelected: false,
-              isClassified: false
-            }
-          ]);
-          
-          setScanProgress(Math.round(((i + 1) / imagesData.length) * 100));
-          await new Promise(resolve => setTimeout(resolve, 300));
+        console.log(`第 ${i + 1} 张图片转换结果:`, imageUrl ? '成功' : '失败', imageUrl?.substring(0, 50));
+
+        if (!imageUrl) {
+          console.warn(`第 ${i + 1} 张图片转换失败`);
+          continue;
         }
-        
-        setTimeout(() => {
-          setIsScanning(false);
-          message.success(`扫描完成！共加载 ${imagesData.length} 张图片`);
-        }, 500);
-      } catch (error) {
-        console.error('处理图片数据失败:', error);
-        setIsScanning(false);
-        message.error('处理图片数据失败');
+
+        setDocuments(prevDocs => [
+          ...prevDocs,
+          {
+            key: `ws-${i}-${Date.now()}`,
+            order: prevDocs.length + 1,
+            category: category,
+            image: imageUrl,
+            fullImage: imageUrl,
+            fileName: fileName,
+            isSelected: false,
+            isClassified: false
+          }
+        ]);
+
+        setScanProgress(Math.round(((i + 1) / imagesData.length) * 100));
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
+
+      setTimeout(() => {
+        setIsScanning(false);
+        message.success(`扫描完成！共加载 ${imagesData.length} 张图片`);
+      }, 500);
     } catch (error) {
-      console.warn('WebSocket连接或操作失败:', error);
-      message.warning('WebSocket连接失败，扫描已取消');
+      console.error('处理图片数据失败:', error);
       setIsScanning(false);
-      return;
+      message.warning('扫描已取消');
     }
   };
 
 
 
-  /**
-   * 插入页面处理函数
-   * 
-   * 功能描述：
-   * 1. 检查是否有选中的图片
-   * 2. 加载1.tiff作为插入图片
-   * 3. 在每张选中图片后插入新图片
-   * 4. 更新文档列表并显示成功消息
-   */
   const handleInsertPage = async () => {
     const selectedDocs = documents.filter(doc => doc.isSelected);
     if (selectedDocs.length === 0) {
@@ -782,49 +738,63 @@ function MedicalRecordScan() {
     }
 
     try {
-      const filePath = `/sample-tiffs/1.tiff`;
-      const imageUrl = await loadTifImage(filePath);
-      
-      if (!imageUrl) {
-        message.error('加载 1.tiff 失败');
+      setIsScanning(true);
+      setScanProgress(0);
+      message.info('正在获取插入图片...');
+
+      const imagesData = await fetchImagesFromWebSocket({
+        ColorMode: "黑白",
+        Resolution: 600,
+        ShowInterface: false,
+        UseFeeder: true,
+        IsDuplex: true
+      });
+
+      if (imagesData.length === 0) {
+        message.warning('未获取到插入图片');
+        setIsScanning(false);
         return;
       }
 
-      const newDocument = {
-        key: `tif-insert-${Date.now()}`,
-        order: documents.length + 1,
-        category: '插入页面',
-        image: imageUrl,
-        fullImage: imageUrl,
-        fileName: '1.tiff',
-        isSelected: false,
-        isClassified: false
-      };
+      const imageUrl = await convertBlobToImage(imagesData[0].blob, imagesData[0].fileName, 'image/tiff');
+      if (!imageUrl) {
+        message.error('图片转换失败');
+        setIsScanning(false);
+        return;
+      }
 
       const newDocuments = [...documents];
+      let insertCount = 0;
       selectedDocs.forEach(doc => {
         const index = newDocuments.findIndex(d => d.key === doc.key);
         if (index !== -1) {
-          newDocuments.splice(index + 1, 0, { ...newDocument, key: `tif-insert-${Date.now()}-${index}` });
+          newDocuments.splice(index + 1, 0, {
+            key: `ws-insert-${Date.now()}-${insertCount}`,
+            order: newDocuments.length + 1,
+            category: '插入页面',
+            image: imageUrl,
+            fullImage: imageUrl,
+            fileName: imagesData[0].fileName,
+            isSelected: false,
+            isClassified: false
+          });
+          insertCount++;
         }
       });
 
       setDocuments(newDocuments);
-      message.success(`成功插入 ${selectedDocs.length} 张图片`);
+      setIsScanning(false);
+      message.success(`成功插入 ${insertCount} 张图片`);
     } catch (error) {
       console.error('插描失败:', error);
+      setIsScanning(false);
       message.error('插描失败');
     }
   };
 
   /**
    * 替扫处理函数（替换扫描）
-   * 
-   * 功能描述：
-   * 1. 检查是否只选中一张图片
-   * 2. 加载1.tiff作为替换图片
-   * 3. 替换选中图片的内容
-   * 4. 更新文档列表并显示成功消息
+   * 通过WebSocket获取图片替换选中的图片
    */
   const handleRescan = async () => {
     const selectedDocs = documents.filter(doc => doc.isSelected);
@@ -838,11 +808,28 @@ function MedicalRecordScan() {
     }
 
     try {
-      const filePath = `/sample-tiffs/1.tiff`;
-      const imageUrl = await loadTifImage(filePath);
-      
+      setIsScanning(true);
+      setScanProgress(0);
+      message.info('正在获取替扫图片...');
+
+      const imagesData = await fetchImagesFromWebSocket({
+        ColorMode: "黑白",
+        Resolution: 600,
+        ShowInterface: false,
+        UseFeeder: true,
+        IsDuplex: true
+      });
+
+      if (imagesData.length === 0) {
+        message.warning('未获取到替扫图片');
+        setIsScanning(false);
+        return;
+      }
+
+      const imageUrl = await convertBlobToImage(imagesData[0].blob, imagesData[0].fileName, 'image/tiff');
       if (!imageUrl) {
-        message.error('加载 1.tiff 失败');
+        message.error('图片转换失败');
+        setIsScanning(false);
         return;
       }
 
@@ -853,15 +840,17 @@ function MedicalRecordScan() {
               ...doc,
               image: imageUrl,
               fullImage: imageUrl,
-              fileName: '1.tiff',
+              fileName: imagesData[0].fileName,
               isClassified: false
             }
           : doc
       ));
 
+      setIsScanning(false);
       message.success('替扫成功');
     } catch (error) {
       console.error('替扫失败:', error);
+      setIsScanning(false);
       message.error('替扫失败');
     }
   };
