@@ -355,7 +355,7 @@ function MedicalRecordScan() {
       // 唯一标识符，转换为字符串以确保类型一致性
       const key = String(item.medicalRecordArchiveTpId || item.id || item.key);
       const name = item.name || item.label || '未命名';                 // 显示名称
-      const code = item.code;  // 保存原始 code 字段，用于绑定
+      const code = item.code || '-1';                                   // 菜单项的 code 值
       
       // 获取该菜单项绑定的图片数量
       const boundCount = getBoundCountForMenu(code);
@@ -1202,16 +1202,14 @@ function MedicalRecordScan() {
 
             </div>
           ) : (
-            <div className="menu-drop-container" style={{ width: '100%' }}>
-              <Menu
-                mode="inline"
-                selectedKeys={[selectedMenuKey || selectedMenu]}
-                openKeys={expandedMenus}
-                onOpenChange={handleMenuOpenChange}
-                onClick={handleMenuClick}
-                items={menuItems}
-              />
-            </div>
+            <Menu
+              mode="inline"
+              selectedKeys={[selectedMenuKey || selectedMenu]}
+              openKeys={expandedMenus}
+              onOpenChange={handleMenuOpenChange}
+              onClick={handleMenuClick}
+              items={menuItems}
+            />
           )}
         </Sider>
 
