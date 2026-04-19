@@ -11,6 +11,31 @@
   flex-direction: column;
 }
 
+/* ==================== 菜单拖拽样式 ==================== */
+/* 菜单项拖拽悬停样式 */
+.ant-menu-item.menu-drop-target {
+  background-color: #e6f7ff !important;
+  border: 2px dashed #1890ff !important;
+}
+
+/* 已绑定的文档卡片样式 */
+.document-card.bound {
+  border-left: 3px solid #52c41a;
+}
+
+/* 已绑定标识 */
+.bound-badge {
+  position: absolute;
+  top: 8px;
+  right: 40px;
+  background-color: #52c41a;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 /* ==================== 顶部标题栏 ==================== */
 .title-bar {
   display: flex;
