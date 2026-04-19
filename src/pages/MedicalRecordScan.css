@@ -388,3 +388,52 @@
   border: 1px dashed #d9d9d9;
   border-radius: 2px;
 }
+
+/* ==================== 拖拽绑定菜单样式 ==================== */
+
+/* 菜单项拖拽区域 */
+.menu-drop-zone {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* 已绑定图片的菜单项样式 */
+.menu-item-bound {
+  background-color: #e6f7ff;
+  border-left: 3px solid #1890ff;
+  padding-left: 8px !important;
+}
+
+/* 菜单项拖拽悬停样式 */
+.menu-drop-hover {
+  background-color: #d9f7be !important;
+  border: 1px dashed #52c41a;
+  border-radius: 4px;
+}
+
+/* 已绑定菜单的图片卡片样式 */
+.document-card.bound {
+  border: 2px solid #1890ff;
+}
+
+/* 已绑定标识徽章 */
+.bound-badge {
+  position: absolute;
+  top: 4px;
+  right: 28px;
+  background-color: #1890ff;
+  color: white;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  z-index: 1;
+}
+
+/* 菜单项提示文本 */
+.menu-item-tooltip {
+  font-size: 12px;
+  color: #666;
+  display: block;
+  margin-top: 4px;
+}

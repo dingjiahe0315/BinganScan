@@ -18,9 +18,9 @@ import {
   FolderOutlined, 
   FileTextOutlined
 } from '@ant-design/icons';
-import './MedicalRecordScan.css';
+import './index.css';
 import * as UTIF from 'utif';
-import { getMedicalRecordMenu } from '../api/menuApi';
+import { getMedicalRecordMenu } from './api';
 
 const { Search } = Input;
 const { Content, Sider } = Layout;
@@ -229,6 +229,7 @@ function MedicalRecordScan() {
   const [scanProgress, setScanProgress] = useState(0);
   const [previewImage, setPreviewImage] = useState(null);
   // 新增状态：菜单数据
+  const [rawMenuData, setRawMenuData] = useState([]);  // 存储原始菜单数据
   const [menuItems, setMenuItems] = useState([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [menuError, setMenuError] = useState(null);
@@ -237,6 +238,11 @@ function MedicalRecordScan() {
   // 拖拽排序状态
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+  // 菜单拖拽绑定状态
+  const [draggedDocumentKey, setDraggedDocumentKey] = useState(null);
+  // 图片与菜单绑定状态（menuCode存储图片绑定的菜单code）
+  // 当前选中的菜单（用于过滤显示）
+  const [selectedMenuKey, setSelectedMenuKey] = useState(null);
 
   /**
    * 获取菜单数据的Effect Hook
@@ -268,10 +274,10 @@ function MedicalRecordScan() {
         // 调用真实API获取菜单数据
         const response = await getMedicalRecordMenu();
         
-        // API返回格式：{ code: 200, body: [...] }，code为200表示成功
-        if (response && response.code === 200 && Array.isArray(response.body)) {
-          // 成功获取数据：转换为Ant Design Menu需要的格式
-          const formattedMenuItems = formatMenuItems(response.body);
+        if (response && response.success && Array.isArray(response.data)) {
+          // 成功获取数据：存储原始数据并格式化
+          setRawMenuData(response.data);
+          const formattedMenuItems = formatMenuItems(response.data);
           setMenuItems(formattedMenuItems);
           setScanEnabled(true);  // 启用扫描功能
         } else {
@@ -296,6 +302,16 @@ function MedicalRecordScan() {
     // 执行数据获取函数
     fetchMenuData();
   }, []);  // 空依赖数组：只在组件挂载时执行一次
+
+  /**
+   * 当文档状态改变时，重新格式化菜单项以更新绑定状态样式
+   */
+  useEffect(() => {
+    if (rawMenuData.length > 0) {
+      const formattedMenuItems = formatMenuItems(rawMenuData);
+      setMenuItems(formattedMenuItems);
+    }
+  }, [documents]);  // 依赖documents状态，每次文档变化时重新格式化菜单
 
 
 
@@ -349,12 +365,31 @@ function MedicalRecordScan() {
     // 格式化每个菜单项：将API数据结构转换为Ant Design Menu数据结构
     const formattedItems = itemsToFormat.map(item => {
       // 字段映射：API返回的字段名可能不同，统一映射为标准字段
-      // 唯一标识符，转换为字符串以确保类型一致性
-      const key = String(item.medicalRecordArchiveTpId || item.id || item.key);
+      // 关键修复：使用code作为key，确保拖拽绑定和点击过滤使用同一个标识符
+      const code = String(item.code || item.medicalRecordArchiveTpId || item.id || item.key);
+      const key = code;  // key必须等于code，保证绑定和过滤一致
       const name = item.name || item.label || '未命名';                 // 显示名称
       
-      // 生成显示标签：直接使用name
-      let label = name;
+      // 获取该菜单项绑定的图片数量
+      const boundCount = getBoundCountForMenu(code);
+      
+      // 生成显示标签：使用class区分已绑定和未绑定状态
+      let label = (
+        <div 
+          className={`menu-drop-zone ${boundCount > 0 ? 'menu-item-bound' : ''}`}
+          onDragOver={handleMenuDragOver}
+          onDragEnter={handleMenuDragEnter}
+          onDragLeave={handleMenuDragLeave}
+          onDrop={(e) => {
+            e.stopPropagation();
+            // 绑定和过滤都使用code（即key）
+            handleMenuDrop(e, key, code);
+          }}
+          onDragEnd={handleMenuDragEnd}
+        >
+          <span>{name}</span>
+        </div>
+      );
       
       // 处理子菜单：如果存在children属性且为数组，则递归格式化
       let children = null;
@@ -371,9 +406,11 @@ function MedicalRecordScan() {
       
       // 构建格式化后的菜单项，符合Ant Design Menu组件要求
       const formattedItem = {
-        key: key,      // 菜单项的唯一标识
-        label: label,  // 菜单项显示文本
-        icon: icon
+        key: key,           // 菜单项的唯一标识（等于code）
+        label: label,       // 菜单项显示文本
+        icon: icon,
+        menuCode: code,     // 存储菜单项的code值，用于图片绑定过滤
+        className: boundCount > 0 ? 'menu-item-bound' : ''  // 菜单项外层class，用于区分已绑定状态
       };
       
       // 如果有children属性（无论是否为空数组），都添加到格式化后的菜单项中
@@ -389,10 +426,10 @@ function MedicalRecordScan() {
     return formattedItems.sort((a, b) => {
       // 从原始数据中获取排序字段（因为格式化后的数据可能丢失了原始字段）
       const originalA = items.find(item => 
-        String(item.medicalRecordArchiveTpId || item.id || item.key) === a.key
+        String(item.code || item.medicalRecordArchiveTpId || item.id || item.key) === a.key
       );
       const originalB = items.find(item => 
-        String(item.medicalRecordArchiveTpId || item.id || item.key) === b.key
+        String(item.code || item.medicalRecordArchiveTpId || item.id || item.key) === b.key
       );
       
       if (!originalA || !originalB) return 0;  // 如果找不到原始数据，保持原顺序
@@ -549,13 +586,155 @@ function MedicalRecordScan() {
     });
   };
 
+  // ==================== 拖拽绑定菜单处理函数 ====================
+
+  /**
+   * 获取指定菜单项绑定的图片数量
+   * 
+   * @param {string} menuCode - 菜单项code
+   * @returns {number} 绑定的图片数量
+   */
+  const getBoundCountForMenu = (menuCode) => {
+    return documents.filter(doc => doc.menuCode && doc.menuCode === menuCode).length;
+  };
+
+  /**
+   * 处理图片拖拽开始（拖向菜单）
+   * 
+   * @param {DragEvent} e - 拖拽事件
+   * @param {string} docKey - 图片的key
+   */
+  const handleDocumentDragStartToMenu = (e, docKey) => {
+    setDraggedDocumentKey(docKey);
+    e.dataTransfer.setData('documentKey', docKey);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  /**
+   * 处理菜单项拖拽悬停
+   * 
+   * @param {DragEvent} e - 拖拽事件
+   */
+  const handleMenuDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    e.currentTarget.classList.add('menu-drop-hover');
+  };
+
+  /**
+   * 处理菜单项拖拽进入
+   * 
+   * @param {DragEvent} e - 拖拽事件
+   */
+  const handleMenuDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.add('menu-drop-hover');
+  };
+
+  /**
+   * 处理菜单项拖拽离开
+   * 
+   * @param {DragEvent} e - 拖拽事件
+   */
+  const handleMenuDragLeave = (e) => {
+    e.currentTarget.classList.remove('menu-drop-hover');
+  };
+
+  /**
+   * 处理图片拖拽放置到菜单项
+   * 
+   * @param {DragEvent} e - 拖拽事件
+   * @param {string} menuKey - 菜单项key
+   * @param {string} menuCode - 菜单项code
+   */
+  const handleMenuDrop = (e, menuKey, menuCode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.remove('menu-drop-hover');
+
+    const docKey = e.dataTransfer.getData('documentKey');
+    if (!docKey) return;
+
+    setDocuments(docs => docs.map(doc => {
+      if (doc.key === docKey) {
+        return { ...doc, menuCode: menuCode, isClassified: true };
+      }
+      return doc;
+    }));
+
+    setDraggedDocumentKey(null);
+    message.success('图片已绑定到菜单项');
+  };
+
+  /**
+   * 处理菜单拖拽结束
+   */
+  const handleMenuDragEnd = () => {
+    setDraggedDocumentKey(null);
+    document.querySelectorAll('.menu-drop-hover').forEach(el => {
+      el.classList.remove('menu-drop-hover');
+    });
+  };
+
+  // ==================== 菜单点击和过滤 ====================
+
   const handleMenuOpenChange = (keys) => {
     setExpandedMenus(keys);
   };
 
   const handleMenuClick = ({ key }) => {
-    setSelectedMenu(key);
+    // 检查是否是叶子节点（非文件夹）
+    const findMenuItem = (items, targetKey) => {
+      for (const menuItem of items) {
+        if (menuItem.key === targetKey) return menuItem;
+        if (menuItem.children) {
+          const found = findMenuItem(menuItem.children, targetKey);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const clickedItem = findMenuItem(menuItems, key);
+    
+    // 只有叶子节点（没有children）才设置为选中菜单
+    if (clickedItem && !clickedItem.children) {
+      // 使用菜单项的menuCode进行过滤（与handleMenuDrop保持一致）
+      const menuCode = clickedItem.menuCode || key;
+      setSelectedMenuKey(menuCode);
+      setSelectedMenu(key);
+    } else {
+      setSelectedMenuKey(null);
+      setSelectedMenu(key);
+    }
   };
+
+  /**
+   * 根据菜单key获取对应的code值
+   */
+  const getMenuCodeByKey = (menuKey) => {
+    if (!menuKey) return null;
+    const findMenuItem = (items, targetKey) => {
+      for (const item of items) {
+        if (item.key === targetKey) return item;
+        if (item.children) {
+          const found = findMenuItem(item.children, targetKey);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const foundItem = findMenuItem(menuItems, menuKey);
+    return foundItem?.menuCode || null;
+  };
+
+  // 过滤文档：根据选中的菜单项显示绑定的图片
+  // 总览模式：显示所有图片
+  // 菜单模式：只显示绑定到该菜单的图片
+  const filteredDocuments = selectedMenuKey
+    ? documents.filter(doc => doc.menuCode && doc.menuCode === selectedMenuKey)
+    : documents;
 
   /**
    * 全选/取消全选处理函数
@@ -937,7 +1116,7 @@ function MedicalRecordScan() {
             <Space size="middle" align="center">
               <Button 
                 type="primary"
-                onClick={handleStartScan}
+                onClick={handleSelectAll}
                 className="select-all-btn"
               >
                 全选
@@ -1031,7 +1210,7 @@ function MedicalRecordScan() {
           ) : (
             <Menu
               mode="inline"
-              selectedKeys={[selectedMenu]}
+              selectedKeys={[selectedMenuKey || selectedMenu]}
               openKeys={expandedMenus}
               onOpenChange={handleMenuOpenChange}
               onClick={handleMenuClick}
@@ -1043,23 +1222,51 @@ function MedicalRecordScan() {
         <Content className="document-area">
           <div className="document-header">
             <div className="current-category">
-              总览
-              <span className="close-icon">×</span>
+              {selectedMenuKey ? `菜单项绑定的图片` : '总览'}
+              {selectedMenuKey && (
+                <span
+                  className="close-icon"
+                  onClick={() => {
+                    setSelectedMenuKey(null);
+                    setSelectedMenu('overview');
+                  }}
+                >
+                  ×
+                </span>
+              )}
             </div>
           </div>
           
           <div className="document-grid">
-            {documents.map((doc, index) => (
+            {filteredDocuments.map((doc, index) => (
               <div
                 key={doc.key}
-                className={`document-card ${doc.isSelected ? 'selected' : ''} ${doc.isClassified ? 'classified' : ''} ${draggedIndex === index ? 'dragging' : ''} ${dragOverIndex === index ? 'drag-over' : ''}`}
+                className={`document-card ${doc.isSelected ? 'selected' : ''} ${doc.isClassified ? 'classified' : ''} ${draggedIndex === index ? 'dragging' : ''} ${dragOverIndex === index ? 'drag-over' : ''} ${doc.menuCode && doc.menuCode !== '-1' ? 'bound' : ''}`}
                 draggable
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragEnter={(e) => handleDragEnter(e, index)}
+                onDragStart={(e) => {
+                  // 同时支持两种拖拽：排序和绑定到菜单
+                  // 注意：这里需要获取原始文档的索引，而不是过滤后的索引       
+                  const originalIndex = documents.findIndex(d => d.key === doc.key);
+                  handleDragStart(e, originalIndex);
+                  handleDocumentDragStartToMenu(e, doc.key);
+                }}
+                onDragOver={(e) => {
+                  const originalIndex = documents.findIndex(d => d.key === doc.key);
+                  handleDragOver(e, originalIndex);
+                }}
+                onDragEnter={(e) => {
+                  const originalIndex = documents.findIndex(d => d.key === doc.key);
+                  handleDragEnter(e, originalIndex);
+                }}
                 onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
+                onDrop={(e) => {
+                  const originalIndex = documents.findIndex(d => d.key === doc.key);
+                  handleDrop(e, originalIndex);
+                }}
+                onDragEnd={() => {
+                  handleDragEnd();
+                  handleMenuDragEnd();
+                }}
               >
                 <div className="card-header">
                   <Checkbox
@@ -1079,6 +1286,9 @@ function MedicalRecordScan() {
                   >
                     ×
                   </span>
+                  {doc.menuCode && doc.menuCode !== '-1' && (
+                    <span className="bound-badge">已绑定</span>
+                  )}
                 </div>
                 <div 
                   className="card-image"
@@ -1104,6 +1314,11 @@ function MedicalRecordScan() {
           <div className="document-footer">
             <Space size="small">
               <span>共：{documents.length}页，</span>
+              {selectedMenuKey && (
+                <span className="classified-count">
+                  当前显示：{filteredDocuments.length}页（绑定到菜单项），
+                </span>
+              )}
               <span className="classified-count">已分类{classifiedCount}页（蓝色边框），</span>
               <span className="unclassified-count">未分类{unclassifiedCount}页</span>
             </Space>
