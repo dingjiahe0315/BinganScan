@@ -26,6 +26,115 @@ const { Search } = Input;
 const { Content, Sider } = Layout;
 
 /**
+ * 将Blob格式的图片转换为DataURL
+ * 
+ * 功能描述：
+ * 1. 接收Blob、ArrayBuffer或base64格式的图片数据
+ * 2. 根据图片格式（TIF/TIFF或其他）进行不同处理
+ * 3. TIF/TIFF格式使用UTIF库转换为JPEG DataURL
+ * 4. 其他格式（JPEG/PNG等）直接转换为DataURL
+ * 
+ * @param {Blob|ArrayBuffer|string} blobData - Blob、ArrayBuffer或base64格式的图片数据
+ * @param {string} fileName - 文件名，用于判断图片格式
+ * @param {string} mimeType - MIME类型（可选）
+ * @returns {string|null} DataURL格式的图片数据，转换失败返回null
+ */
+const convertBlobToImage = async (blobData, fileName, mimeType = 'image/jpeg') => {
+  try {
+    const isTiff = fileName && (fileName.toLowerCase().endsWith('.tif') || fileName.toLowerCase().endsWith('.tiff'));
+    
+    // 如果是base64字符串，先转换为ArrayBuffer
+    let arrayBuffer;
+    if (typeof blobData === 'string') {
+      // base64字符串转换为ArrayBuffer
+      const binaryString = atob(blobData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      arrayBuffer = bytes.buffer;
+    } else if (blobData instanceof ArrayBuffer) {
+      arrayBuffer = blobData;
+    } else {
+      // Blob转换为ArrayBuffer
+      arrayBuffer = await blobData.arrayBuffer();
+    }
+    
+    if (isTiff) {
+      // TIF/TIFF格式：使用UTIF库转换
+      const ifds = UTIF.decode(arrayBuffer);
+      
+      if (ifds && ifds.length > 0) {
+        const ifd = ifds[0];
+        
+        // UTIF库使用TIFF标签编号作为字段名
+        // t256 = ImageWidth (图像宽度)
+        // t257 = ImageLength (图像高度)
+        // 这些字段是数组，需要取第一个元素
+        const width = ifd.t256?.[0] || ifd.tifw || ifd.width;
+        const height = ifd.t257?.[0] || ifd.tifh || ifd.height;
+        
+        console.log('TIF解析结果:', {
+          ifdCount: ifds.length,
+          width: width,
+          height: height,
+          t256: ifd.t256,
+          t257: ifd.t257,
+          t274: ifd.t274
+        });
+        
+        if (!width || !height) {
+          console.error('无法获取图片尺寸，IFD对象:', ifd);
+          throw new Error('无法获取TIF图片尺寸');
+        }
+        
+        UTIF.decodeImage(arrayBuffer, ifd);
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        const rgba = UTIF.toRGBA8(ifd);
+        
+        console.log('RGBA数据:', {
+          length: rgba?.length,
+          expectedLength: width * height * 4
+        });
+        
+        const imageData = ctx.createImageData(width, height);
+        imageData.data.set(rgba);
+        ctx.putImageData(imageData, 0, 0);
+        
+        console.log('Canvas尺寸:', canvas.width, 'x', canvas.height);
+        
+        // 转换为JPEG DataURL
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        console.log('DataURL生成成功，长度:', dataUrl.length);
+        
+        return dataUrl;
+      }
+      
+      throw new Error('无法解析 TIF 文件');
+    } else {
+      // 普通图片格式（JPEG/PNG/WebP等）：直接构建DataURL
+      const uint8Array = new Uint8Array(arrayBuffer);
+      // 分块转换以避免调用栈溢出
+      let base64 = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, i + chunkSize);
+        base64 += String.fromCharCode(...chunk);
+      }
+      return `data:${mimeType};base64,${btoa(base64)}`;
+    }
+  } catch (error) {
+    console.error('转换图片失败:', error);
+    return null;
+  }
+};
+
+/**
  * 加载并解析TIF/TIFF格式的图片文件
  * 
  * 功能描述：
@@ -483,9 +592,8 @@ function MedicalRecordScan() {
    * 功能描述：
    * 1. 检查是否正在扫描，避免重复操作
    * 2. 连接WebSocket服务器执行扫描操作
-   * 3. 如果WebSocket成功，则显示WebSocket返回的TIF图片
-   * 4. 如果WebSocket失败，则不显示任何图片
-   * 5. 更新扫描进度和状态
+   * 3. 接收Blob格式的图片数据并转换为可显示的格式
+   * 4. 更新扫描进度和状态
    */
   const handleStartScan = async () => {
     if (isScanning) {
@@ -497,14 +605,18 @@ function MedicalRecordScan() {
     setScanProgress(0);
     message.info('开始扫描...');
 
-    // 尝试连接WebSocket并执行方法，如果失败则不显示任何图片
+    // 尝试连接WebSocket并获取图片数据
     try {
       // 连接WebSocket服务器
       const ws = new WebSocket('ws://localhost:8080');
       
+      // 设置接收二进制数据为Blob格式
+      ws.binaryType = 'blob';
+      
       // 等待连接建立
       await new Promise((resolve, reject) => {
         ws.onopen = () => {
+          console.log('WebSocket连接成功');
           resolve();
         };
         ws.onerror = (error) => {
@@ -516,70 +628,103 @@ function MedicalRecordScan() {
         };
       });
 
-      // 调用第一个方法：开始扫描
-      await new Promise((resolve, reject) => {
-        ws.onmessage = (event) => {
-          const response = JSON.parse(event.data);
-          if (response.method === 'startScan') {
-            if (response.success) {
-              resolve();
-            } else {
-              reject(new Error('第一个方法执行失败'));
-            }
-          }
-        };
-        
-        ws.send(JSON.stringify({ method: 'startScan' }));
-      });
-
-      // 调用第二个方法：加载图片，并获取图片数据
-      // 预期WebSocket服务器返回格式：
-      // {
-      //   "method": "loadImages",
-      //   "success": true,
-      //   "images": [
-      //     {
-      //       "imageUrl": "data:image/jpeg;base64,...", // 图片数据
-      //       "fileName": "image-1.tiff",              // 文件名
-      //       "category": "病案首页"                    // 分类（可选）
-      //     }
-      //   ]
-      // }
+      // 发送空参数调用方法，接收Blob格式的图片数据
       const imagesData = await new Promise((resolve, reject) => {
-        ws.onmessage = (event) => {
-          const response = JSON.parse(event.data);
-          if (response.method === 'loadImages') {
-            if (response.success && response.images && Array.isArray(response.images)) {
-              resolve(response.images);
-            } else {
-              reject(new Error('第二个方法执行失败或返回数据格式不正确'));
+        const receivedImages = [];
+        let timeoutId = null;
+        let closeReceived = false;
+
+        const messageHandler = (event) => {
+          console.log('收到消息:', event.data);
+          
+          // 处理文本消息 - 检查是否是完成信号
+          if (typeof event.data === 'string') {
+            const text = event.data.toLowerCase();
+            if (text.includes('completed') || text.includes('finished') || text.includes('done')) {
+              console.log(`收到完成信号，已接收 ${receivedImages.length} 张图片`);
+              clearTimeout(timeoutId);
+              closeReceived = true;
+              resolve(receivedImages);
             }
+            return;
+          }
+          
+          // 直接接收Blob格式的图片数据
+          if (event.data instanceof Blob) {
+            const blob = event.data;
+            const imageIndex = receivedImages.length;
+            const fileName = `image-${imageIndex}.tiff`;
+            
+            receivedImages.push({
+              blob: blob,
+              fileName: fileName
+            });
+            
+            console.log(`已接收图片 ${imageIndex + 1}，大小: ${(blob.size / 1024).toFixed(2)} KB`);
+            
+            // 更新进度（临时显示）
+            setScanProgress(Math.min(90, receivedImages.length * 10));
           }
         };
         
-        ws.send(JSON.stringify({ method: 'loadImages' }));
+        ws.onmessage = messageHandler;
+        
+        // 监听连接关闭事件，表示数据传输完成
+        ws.onclose = () => {
+          closeReceived = true;
+          clearTimeout(timeoutId);
+          console.log(`数据传输完成，共接收 ${receivedImages.length} 张图片`);
+          resolve(receivedImages);
+        };
+        
+        ws.onerror = (error) => {
+          clearTimeout(timeoutId);
+          reject(new Error('WebSocket接收图片时发生错误'));
+        };
+        
+        // 设置超时处理（60秒）
+        timeoutId = setTimeout(() => {
+          if (!closeReceived) {
+            ws.close();
+            reject(new Error('接收图片超时'));
+          }
+        }, 60000);
+        
+        // 发送空参数调用方法
+        const params = JSON.stringify({
+          "ColorMode": "黑白",
+          "Resolution": 600,
+          "ShowInterface": false,
+          "UseFeeder": true,
+          "IsDuplex": true
+        });
+        ws.send(`startScan:${params}`);
       });
 
-      // 关闭WebSocket连接
-      ws.close();
-      message.info('WebSocket操作成功完成');
+      message.info('图片数据接收完成');
 
-      // 使用WebSocket返回的图片数据创建文档
+      // 使用接收到的图片数据创建文档
       try {
         const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
         
         for (let i = 0; i < imagesData.length; i++) {
           const imageData = imagesData[i];
-          // WebSocket服务器返回的图片数据格式假设：
-          // imageData应包含imageUrl、fileName、category等字段
-          // imageUrl可以是Data URL、base64编码或图片URL
-          // 支持多种字段名：imageUrl、url、data
-          const imageUrl = imageData.imageUrl || imageData.url || imageData.data;
           const fileName = imageData.fileName || `image-${i}.tiff`;
           const category = imageData.category || categories[i % categories.length];
           
+          console.log(`开始转换第 ${i + 1} 张图片:`, {
+            fileName,
+            blobSize: imageData.blob.size,
+            blobType: imageData.blob.type
+          });
+          
+          // 将Blob转换为可显示的图片URL
+          const imageUrl = await convertBlobToImage(imageData.blob, fileName, 'image/tiff');
+          
+          console.log(`第 ${i + 1} 张图片转换结果:`, imageUrl ? '成功' : '失败', imageUrl?.substring(0, 50));
+          
           if (!imageUrl) {
-            console.warn(`第 ${i + 1} 张图片数据缺少imageUrl`, imageData);
+            console.warn(`第 ${i + 1} 张图片转换失败`);
             continue;
           }
           
@@ -606,12 +751,12 @@ function MedicalRecordScan() {
           message.success(`扫描完成！共加载 ${imagesData.length} 张图片`);
         }, 500);
       } catch (error) {
-        console.error('处理WebSocket返回的图片数据失败:', error);
+        console.error('处理图片数据失败:', error);
         setIsScanning(false);
         message.error('处理图片数据失败');
       }
     } catch (error) {
-      console.warn('WebSocket连接或操作失败，不显示任何图片:', error);
+      console.warn('WebSocket连接或操作失败:', error);
       message.warning('WebSocket连接失败，扫描已取消');
       setIsScanning(false);
       return;
@@ -792,7 +937,7 @@ function MedicalRecordScan() {
             <Space size="middle" align="center">
               <Button 
                 type="primary"
-                onClick={handleSelectAll}
+                onClick={handleStartScan}
                 className="select-all-btn"
               >
                 全选
