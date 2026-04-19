@@ -18,6 +18,34 @@
   border: 2px dashed #1890ff !important;
 }
 
+/* 菜单项拖拽区域 */
+.menu-drop-zone {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+
+/* 菜单项绑定数量标识 */
+.menu-binding-badge {
+  background-color: #1890ff;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+/* 菜单项提示信息 */
+.menu-item-tooltip {
+  color: #999;
+  font-size: 11px;
+  margin-left: 8px;
+  opacity: 0.7;
+}
+
 /* 已绑定的文档卡片样式 */
 .document-card.bound {
   border-left: 3px solid #52c41a;

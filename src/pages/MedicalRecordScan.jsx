@@ -272,9 +272,9 @@ function MedicalRecordScan() {
         const response = await getMedicalRecordMenu();
         
         // API返回格式：{ code: 200, body: [...] }，code为200表示成功
-        if (response && response.code === 200 && Array.isArray(response.body)) {
+        if (response && response.success && Array.isArray(response.data)) {
           // 成功获取数据：转换为Ant Design Menu需要的格式
-          const formattedMenuItems = formatMenuItems(response.body);
+          const formattedMenuItems = formatMenuItems(response.data);
           setMenuItems(formattedMenuItems);
           setScanEnabled(true);  // 启用扫描功能
         } else {
@@ -299,98 +299,6 @@ function MedicalRecordScan() {
     // 执行数据获取函数
     fetchMenuData();
   }, []);  // 空依赖数组：只在组件挂载时执行一次
-
-  // 新增：为菜单项添加拖拽放置事件监听
-  useEffect(() => {
-    if (!menuItems || menuItems.length === 0) return;
-
-    // 使用事件委托，在 Menu 容器上监听
-    const menuContainer = document.querySelector('.menu-drop-container');
-    if (!menuContainer) return;
-
-    const handleDragOver = (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
-      
-      // 查找最近的菜单项
-      const menuItem = e.target.closest('.ant-menu-item');
-      if (menuItem) {
-        // 移除其他菜单项的高亮
-        document.querySelectorAll('.ant-menu-item.menu-drop-target').forEach(el => {
-          if (el !== menuItem) el.classList.remove('menu-drop-target');
-        });
-        // 添加当前菜单项高亮
-        menuItem.classList.add('menu-drop-target');
-      }
-    };
-
-    const handleDrop = (e) => {
-      e.preventDefault();
-      
-      // 查找最近的菜单项
-      const menuItem = e.target.closest('.ant-menu-item');
-      if (menuItem && draggedDocumentKey) {
-        // 获取菜单项的 key 和 code
-        const menuKey = menuItem.getAttribute('aria-selected') || menuItem.querySelector('[role="menuitem"]')?.getAttribute('data-menu-key');
-        const rect = menuItem.getBoundingClientRect();
-        
-        // 从 formattedItem 中获取 code
-        const findMenuCode = (items, key) => {
-          for (const item of items) {
-            if (item.key === key) return item.code;
-            if (item.children) {
-              const found = findMenuCode(item.children, key);
-              if (found) return found;
-            }
-          }
-          return null;
-        };
-        
-        const menuCode = findMenuCode(menuItems, menuKey) || menuKey;
-        
-        // 绑定文档到菜单项
-        setDocuments(docs => docs.map(doc =>
-          doc.key === draggedDocumentKey
-            ? { ...doc, menuCode: menuCode || '-1' }
-            : doc
-        ));
-
-        message.success(`已将图片绑定到菜单项`);
-        
-        // 清理
-        setDraggedDocumentKey(null);
-        document.querySelectorAll('.ant-menu-item.menu-drop-target').forEach(el => {
-          el.classList.remove('menu-drop-target');
-        });
-      }
-    };
-
-    const handleDragLeave = (e) => {
-      const menuItem = e.target.closest('.ant-menu-item');
-      if (menuItem && !menuItem.contains(e.relatedTarget)) {
-        menuItem.classList.remove('menu-drop-target');
-      }
-    };
-
-    const handleDragEnd = () => {
-      document.querySelectorAll('.ant-menu-item.menu-drop-target').forEach(el => {
-        el.classList.remove('menu-drop-target');
-      });
-      setDraggedDocumentKey(null);
-    };
-
-    menuContainer.addEventListener('dragover', handleDragOver);
-    menuContainer.addEventListener('drop', handleDrop);
-    menuContainer.addEventListener('dragleave', handleDragLeave);
-    menuContainer.addEventListener('dragend', handleDragEnd);
-
-    return () => {
-      menuContainer.removeEventListener('dragover', handleDragOver);
-      menuContainer.removeEventListener('drop', handleDrop);
-      menuContainer.removeEventListener('dragleave', handleDragLeave);
-      menuContainer.removeEventListener('dragend', handleDragEnd);
-    };
-  }, [menuItems, draggedDocumentKey]);
 
 
 
@@ -449,9 +357,32 @@ function MedicalRecordScan() {
       const name = item.name || item.label || '未命名';                 // 显示名称
       const code = item.code;  // 保存原始 code 字段，用于绑定
       
-      // 生成显示标签：直接使用 name
-      let label = name;
-      
+      // 获取该菜单项绑定的图片数量
+      const boundCount = getBoundCountForMenu(code);
+
+      // 生成显示标签：包含菜单名称和绑定数量
+      let label = (
+        <div
+          className="menu-drop-zone"
+          onDragOver={handleMenuDragOver}
+          onDragEnter={handleMenuDragEnter}
+          onDragLeave={handleMenuDragLeave}
+          onDrop={(e) => {
+            e.stopPropagation();
+            handleMenuDrop(e, key, code);
+          }}
+          onDragEnd={handleMenuDragEnd}
+        >
+          <span>{name}</span>
+          {boundCount > 0 && (
+            <span className="menu-binding-badge">{boundCount}</span>
+          )}
+          {boundCount === 0 && (
+            <small className="menu-item-tooltip">可拖拽图片到此进行绑定</small>
+          )}
+        </div>
+      );
+
       // 处理子菜单：如果存在 children 属性且为数组，则递归格式化
       let children = null;
       const hasChildrenProperty = item.children !== undefined && Array.isArray(item.children);
@@ -468,14 +399,9 @@ function MedicalRecordScan() {
       // 构建格式化后的菜单项，符合 Ant Design Menu 组件要求
       const formattedItem = {
         key: key,      // 菜单项的唯一标识
-        label: label,  // 菜单项显示文本
-        icon: icon,
-        title: `拖拽图片到：${label}` // 添加 title 提示
+        label: label,  // 菜单项显示文本（包含拖拽事件监听）
+        icon: icon
       };
-      
-      // 保存额外属性用于后续处理
-      formattedItem.code = code;
-      formattedItem.originalLabel = label;
       
       // 如果有 children 属性（无论是否为空数组），都添加到格式化后的菜单项中
       if (hasChildrenProperty) {
@@ -1184,7 +1110,7 @@ function MedicalRecordScan() {
             <Space size="middle" align="center">
               <Button 
                 type="primary"
-                onClick={handleStartScan}
+                onClick={handleSelectAll}
                 className="select-all-btn"
               >
                 全选
