@@ -42,12 +42,14 @@ const convertBlobToImage = async (blobData, fileName, mimeType = 'image/jpeg') =
         const width = ifd.t256?.[0] || ifd.tifw || ifd.width;
         const height = ifd.t257?.[0] || ifd.tifh || ifd.height;
         if (!width || !height) throw new Error('无法获取TIF图片尺寸');
-        UTIF.decodeImage(arrayBuffer, ifd);
+        if (!ifd.t259) ifd.t259 = [1];
+        if (!ifd.t258) ifd.t258 = [8, 8, 8, 8];
+        if (!ifd.t277) ifd.t277 = [4];
+        const rgba = UTIF.toRGBA8(ifd);
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        const rgba = UTIF.toRGBA8(ifd);
         const imageData = ctx.createImageData(width, height);
         imageData.data.set(rgba);
         ctx.putImageData(imageData, 0, 0);
