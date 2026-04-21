@@ -16,7 +16,8 @@ function PatientInfoBar({
   selectedCount,
   isScanning,
   scanProgress,
-  scanEnabled
+  scanEnabled,
+  uploadComplete
 }) {
   return (
     <div className="patient-info-bar-wrapper">
@@ -28,8 +29,8 @@ function PatientInfoBar({
                 <span style={{ whiteSpace: 'nowrap', padding: '0 8px', lineHeight: '32px', backgroundColor: '#f0f0f0', borderRadius: '2px 0 0 2px' }}>病案条码：</span>
                 <Search
                   placeholder="扫码枪或者手动输入条码号"
-                  value={barcode}
-                  onChange={(e) => setBarcode(e.target.value)}
+                  value={medicalRecordArchiveId}
+                  onChange={(e) => setMedicalRecordArchiveId(e.target.value)}
                   onSearch={onScan}
                   style={{ width: 240 }}
                   enterButton={<SearchOutlined />}
@@ -98,7 +99,7 @@ function PatientInfoBar({
               <Button
                 type="primary"
                 onClick={onComplete}
-                disabled={!scanEnabled || isScanning}
+                disabled={!scanEnabled || isScanning || !uploadComplete}
               >
                 扫描完成
               </Button>

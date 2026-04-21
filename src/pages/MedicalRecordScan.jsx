@@ -91,6 +91,7 @@ function MedicalRecordScan() {
   const [draggedDocumentKey, setDraggedDocumentKey] = useState(null);
   const [selectedMenuKey, setSelectedMenuKey] = useState(null);
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [uploadComplete, setUploadComplete] = useState(true);
 
   useEffect(() => {
     const fetchMenuData = async () => {
@@ -413,6 +414,7 @@ function MedicalRecordScan() {
 
   const handleUploadAll = async () => {
     if (documents.length === 0) { message.warning('没有可上传的图片'); return; }
+    setUploadComplete(false);
     let uploadedDocs = [...documents];
     try {
       for (let i = 0; i < uploadedDocs.length; i++) {
@@ -432,10 +434,12 @@ function MedicalRecordScan() {
       console.log('上传后补充fileId信息', uploadedDocs);
       setDocuments(uploadedDocs);
       setUploadModalVisible(false);
+      setUploadComplete(true);
       message.success(`成功上传 ${documents.length} 张图片`);
     } catch (error) {
       console.error('上传失败:', error);
       message.error(`上传失败: ${error.message}`);
+      setUploadComplete(true);
     }
   };
 
@@ -486,6 +490,7 @@ function MedicalRecordScan() {
         isScanning={isScanning}
         scanProgress={scanProgress}
         scanEnabled={scanEnabled}
+        uploadComplete={uploadComplete}
         visitType={'114'}
       />
 
@@ -545,7 +550,6 @@ function MedicalRecordScan() {
         title="扫描上传"
         open={uploadModalVisible}
         onCancel={handleUploadModalCancel}
-        onOk={handleUploadAll}
         footer={[
           <Button key="cancel" onClick={handleUploadModalCancel}>
             取消
