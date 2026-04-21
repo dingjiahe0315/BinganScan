@@ -4,8 +4,8 @@ import { SearchOutlined, UploadOutlined } from '@ant-design/icons';
 const { Search } = Input;
 
 function PatientInfoBar({
-  barcode,
-  setBarcode,
+  medicalRecordArchiveId,
+  setMedicalRecordArchiveId,
   onScan,
   onInsertPage,
   onRescan,

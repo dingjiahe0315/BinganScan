@@ -73,7 +73,7 @@ const convertBlobToImage = async (blobData, fileName, mimeType = 'image/jpeg') =
 };
 
 function MedicalRecordScan() {
-  const [barcode, setBarcode] = useState('');
+  const [medicalRecordArchiveId, setMedicalRecordArchiveId] = useState('');
   const [selectedMenu, setSelectedMenu] = useState('overview');
   const [expandedMenus, setExpandedMenus] = useState(['discharge-related', 'progress-note']);
   const [documents, setDocuments] = useState([]);
@@ -211,18 +211,16 @@ function MedicalRecordScan() {
     setScanProgress(0);
     message.info('开始扫描...');
     try {
-      const params = { ColorMode: "黑白", Resolution: 600, ShowInterface: false, UseFeeder: true, IsDuplex: true };
+      const params = {};
       const imagesData = await fetchImagesFromWebSocket(params);
       if (imagesData.length === 0) { message.warning('未获取到扫描图片'); setIsScanning(false); return; }
       message.info('图片数据接收完成');
-      const categories = ['病案首页', '入院记录', '首次病程', '出院记录', '病程记录', '检验报告'];
       for (let i = 0; i < imagesData.length; i++) {
         const imageData = imagesData[i];
         const fileName = imageData.fileName || `image-${i}.tiff`;
-        const category = imageData.category || categories[i % categories.length];
         const imageUrl = await convertBlobToImage(imageData.blob, fileName, 'image/tiff');
         if (!imageUrl) continue;
-        setDocuments(prev => [...prev, { key: `ws-${i}-${Date.now()}`, order: prev.length + 1, category, image: imageUrl, fullImage: imageUrl, fileName, isSelected: false, isClassified: false }]);
+        setDocuments(prev => [...prev, { key: `ws-${i}-${Date.now()}`, order: prev.length + 1, image: imageUrl, fullImage: imageUrl, fileName, isSelected: false, isClassified: false }]);
         setScanProgress(Math.round(((i + 1) / imagesData.length) * 100));
         await new Promise(r => setTimeout(r, 300));
       }
@@ -332,7 +330,7 @@ function MedicalRecordScan() {
       setIsScanning(true);
       setScanProgress(0);
       message.info('正在获取插入图片...');
-      const imagesData = await fetchImagesFromWebSocket({ ColorMode: "黑白", Resolution: 600, ShowInterface: false, UseFeeder: true, IsDuplex: true });
+      const imagesData = await fetchImagesFromWebSocket({});
       if (imagesData.length === 0) { message.warning('未获取到插入图片'); setIsScanning(false); return; }
       const imageUrl = await convertBlobToImage(imagesData[0].blob, imagesData[0].fileName, 'image/tiff');
       if (!imageUrl) { message.error('图片转换失败'); setIsScanning(false); return; }
@@ -341,7 +339,7 @@ function MedicalRecordScan() {
       selectedDocs.forEach(doc => {
         const index = newDocuments.findIndex(d => d.key === doc.key);
         if (index !== -1) {
-          newDocuments.splice(index + 1, 0, { key: `ws-insert-${Date.now()}-${insertCount}`, order: newDocuments.length + 1, category: '插入页面', image: imageUrl, fullImage: imageUrl, fileName: imagesData[0].fileName, isSelected: false, isClassified: false });
+          newDocuments.splice(index + 1, 0, { key: `ws-insert-${Date.now()}-${insertCount}`, order: newDocuments.length + 1, image: imageUrl, fullImage: imageUrl, fileName: imagesData[0].fileName, isSelected: false, isClassified: false });
           insertCount++;
         }
       });
@@ -363,7 +361,7 @@ function MedicalRecordScan() {
       setIsScanning(true);
       setScanProgress(0);
       message.info('正在获取替扫图片...');
-      const imagesData = await fetchImagesFromWebSocket({ ColorMode: "黑白", Resolution: 600, ShowInterface: false, UseFeeder: true, IsDuplex: true });
+      const imagesData = await fetchImagesFromWebSocket({});
       if (imagesData.length === 0) { message.warning('未获取到替扫图片'); setIsScanning(false); return; }
       const imageUrl = await convertBlobToImage(imagesData[0].blob, imagesData[0].fileName, 'image/tiff');
       if (!imageUrl) { message.error('图片转换失败'); setIsScanning(false); return; }
@@ -411,21 +409,26 @@ function MedicalRecordScan() {
 
   const handleUploadAll = async () => {
     if (documents.length === 0) { message.warning('没有可上传的图片'); return; }
+    let uploadedDocs = [...documents];
     try {
-      const formData = new FormData();
-      documents.forEach((doc, index) => {
-        const blob = dataUrlToBlob(doc.fullImage || doc.image, doc.fileName || `image-${index}.tif`);
-        formData.append('files', blob, doc.fileName || `image-${index}.tif`);
-      });
-      const response = await fetch('/upload', { method: 'POST', body: formData });
-      const result = await response.json();
-      if (result.code === 0 || result.success) {
-        message.success(`成功上传 ${documents.length} 张图片`);
-        setDocuments([]);
-        setUploadModalVisible(false);
-      } else {
-        throw new Error(result.message || '上传失败');
+      for (let i = 0; i < uploadedDocs.length; i++) {
+        const doc = uploadedDocs[i];
+        const blob = dataUrlToBlob(doc.fullImage || doc.image, doc.fileName || `image-${i}.tif`);
+        const formData = new FormData();
+        formData.append('files', blob, doc.fileName || `image-${i}.tif`);
+        const response = await fetch('/upload', { method: 'POST', body: formData });
+        const result = await response.json();
+        if (result.code === 0 || result.success) {
+          uploadedDocs[i] = { ...uploadedDocs[i], fileId: result.data?.reocrd?.fileId || result?.record?.fileId };
+          message.success(`第 ${i + 1}/${documents.length} 张图片上传成功`);
+        } else {
+          throw new Error(result.message || `第 ${i + 1} 张图片上传失败`);
+        }
       }
+      console.log('上传后补充fileId信息', uploadedDocs);
+      setDocuments(uploadedDocs);
+      setUploadModalVisible(false);
+      message.success(`成功上传 ${documents.length} 张图片`);
     } catch (error) {
       console.error('上传失败:', error);
       message.error(`上传失败: ${error.message}`);
@@ -479,6 +482,7 @@ function MedicalRecordScan() {
         isScanning={isScanning}
         scanProgress={scanProgress}
         scanEnabled={scanEnabled}
+        visitType={'114'}
       />
 
       <Layout className="main-content">
