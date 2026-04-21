@@ -1,5 +1,5 @@
 import { Row, Col, Input, Button, Space, Progress } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
+import { SearchOutlined, UploadOutlined } from '@ant-design/icons';
 
 const { Search } = Input;
 
@@ -9,7 +9,7 @@ function PatientInfoBar({
   onScan,
   onInsertPage,
   onRescan,
-  onSaveTemp,
+  onUploadClick,
   onComplete,
   onDeleteSelected,
   onSelectAll,
@@ -52,7 +52,7 @@ function PatientInfoBar({
             <Space size="middle" align="center">
               <Button
                 type="primary"
-                onClick={onScan}
+                onClick={onSelectAll}
                 className="select-all-btn"
               >
                 全选
@@ -89,10 +89,11 @@ function PatientInfoBar({
               </Button>
               <Button
                 type="primary"
-                onClick={onSaveTemp}
+                icon={<UploadOutlined />}
+                onClick={onUploadClick}
                 disabled={!scanEnabled || isScanning}
               >
-                扫描暂存
+                扫描上传
               </Button>
               <Button
                 type="primary"

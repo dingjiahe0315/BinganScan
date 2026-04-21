@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Checkbox, Button, Input, message, Modal, Row, Col, Space, Progress, Image } from 'antd';
+import { Layout, Checkbox, Button, Input, message, Modal, Row, Col, Space, Progress, Image, Upload } from 'antd';
 import { SearchOutlined, FolderOutlined, FileTextOutlined } from '@ant-design/icons';
 import './MedicalRecordScan.css';
 import * as UTIF from 'utif';
@@ -90,6 +90,7 @@ function MedicalRecordScan() {
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [draggedDocumentKey, setDraggedDocumentKey] = useState(null);
   const [selectedMenuKey, setSelectedMenuKey] = useState(null);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
 
   useEffect(() => {
     const fetchMenuData = async () => {
@@ -377,7 +378,60 @@ function MedicalRecordScan() {
     }
   };
 
-  const handleSaveTemp = () => { message.info('扫描暂存功能待实现'); };
+  const handleSaveTemp = () => {
+    if (documents.length === 0) {
+      message.warning('没有可上传的图片');
+      return;
+    }
+    setUploadModalVisible(true);
+  };
+
+  const handleUploadModalCancel = () => {
+    setUploadModalVisible(false);
+  };
+
+  const uploadFileList = documents.map((doc, index) => ({
+    uid: doc.key,
+    name: doc.fileName || `image-${index}.tif`,
+    status: 'done',
+    thumbUrl: doc.fullImage || doc.image,
+    url: doc.fullImage || doc.image,
+  }));
+
+  const dataUrlToBlob = (dataUrl, fileName) => {
+    const [header, base64] = dataUrl.split(',');
+    const mimeType = header.match(/:(.*?);/)?.[1] || 'image/tiff';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mimeType });
+  };
+
+  const handleUploadAll = async () => {
+    if (documents.length === 0) { message.warning('没有可上传的图片'); return; }
+    try {
+      const formData = new FormData();
+      documents.forEach((doc, index) => {
+        const blob = dataUrlToBlob(doc.fullImage || doc.image, doc.fileName || `image-${index}.tif`);
+        formData.append('files', blob, doc.fileName || `image-${index}.tif`);
+      });
+      const response = await fetch('/upload', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (result.code === 0 || result.success) {
+        message.success(`成功上传 ${documents.length} 张图片`);
+        setDocuments([]);
+        setUploadModalVisible(false);
+      } else {
+        throw new Error(result.message || '上传失败');
+      }
+    } catch (error) {
+      console.error('上传失败:', error);
+      message.error(`上传失败: ${error.message}`);
+    }
+  };
+
   const handleScanComplete = () => {
     Modal.confirm({
       title: '确认扫描完成？',
@@ -417,7 +471,7 @@ function MedicalRecordScan() {
         onScan={handleStartScan}
         onInsertPage={handleInsertPage}
         onRescan={handleRescan}
-        onSaveTemp={handleSaveTemp}
+        onUploadClick={() => setUploadModalVisible(true)}
         onComplete={handleScanComplete}
         onDeleteSelected={handleDeleteSelected}
         onSelectAll={handleSelectAll}
@@ -478,6 +532,32 @@ function MedicalRecordScan() {
           <Image src={previewImage} style={{ display: 'none' }} />
         </Image.PreviewGroup>
       )}
+
+      <Modal
+        title="扫描上传"
+        open={uploadModalVisible}
+        onCancel={handleUploadModalCancel}
+        onOk={handleUploadAll}
+        footer={[
+          <Button key="cancel" onClick={handleUploadModalCancel}>
+            取消
+          </Button>,
+          <Button key="submit" type="primary" onClick={handleUploadAll}>
+            确认上传
+          </Button>,
+        ]}
+        width={600}
+      >
+        <Upload
+          listType="picture"
+          fileList={uploadFileList}
+          showUploadList={{ showPreviewIcon: false, showRemoveIcon: false, showDownloadIcon: false }}
+          beforeUpload={() => false}
+        />
+        <div style={{ marginTop: 12, fontSize: 13, color: '#666' }}>
+          共 <strong>{documents.length}</strong> 张图片，文件类型：.tif / .tiff
+        </div>
+      </Modal>
     </Layout>
   );
 }
