@@ -147,7 +147,11 @@ function MedicalRecordScan() {
             e.stopPropagation();
             const docKey = e.dataTransfer.getData('documentKey');
             if (!docKey) return;
-            setDocuments(docs => docs.map(doc => doc.key === docKey ? { ...doc, menuCode: key, isClassified: true } : doc));
+            setDocuments(docs => {
+              const boundDocs = docs.filter(doc => doc.menuCode === key);
+              const pageNumber = boundDocs.length + 1;
+              return docs.map(doc => doc.key === docKey ? { ...doc, menuCode: key, menuTpId: item.medicalRecordArchiveTpId || '', isClassified: true, pageNumber } : doc);
+            });
             setDraggedDocumentKey(null);
             message.success('图片已绑定到菜单项');
           }}
@@ -160,7 +164,7 @@ function MedicalRecordScan() {
       const hasChildren = item.children !== undefined && Array.isArray(item.children);
       return {
         key, label, icon: hasChildren ? <FolderOutlined /> : <FileTextOutlined />,
-        menuCode: code, className: boundCount > 0 ? 'menu-item-bound' : '',
+        menuCode: code, menuTpId: item.medicalRecordArchiveTpId || '', className: boundCount > 0 ? 'menu-item-bound' : '',
         ...(hasChildren ? { children } : {})
       };
     });
@@ -469,8 +473,8 @@ function MedicalRecordScan() {
   return (
     <Layout className="medical-record-scan">
       <PatientInfoBar
-        barcode={barcode}
-        setBarcode={setBarcode}
+        medicalRecordArchiveId={medicalRecordArchiveId}
+        setMedicalRecordArchiveId={setMedicalRecordArchiveId}
         onScan={handleStartScan}
         onInsertPage={handleInsertPage}
         onRescan={handleRescan}
