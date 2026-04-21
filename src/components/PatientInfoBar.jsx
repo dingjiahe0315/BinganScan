@@ -1,5 +1,5 @@
 import { Row, Col, Input, Button, Space, Progress } from 'antd';
-import { SearchOutlined, UploadOutlined } from '@ant-design/icons';
+import { SearchOutlined, UploadOutlined, SaveOutlined } from '@ant-design/icons';
 
 const { Search } = Input;
 
@@ -92,14 +92,15 @@ function PatientInfoBar({
                 type="primary"
                 icon={<UploadOutlined />}
                 onClick={onUploadClick}
-                disabled={!scanEnabled || isScanning}
+                disabled={!scanEnabled || isScanning || uploadComplete}
               >
                 扫描上传
               </Button>
               <Button
                 type="primary"
+                icon={<SaveOutlined />}
                 onClick={onComplete}
-                disabled={!scanEnabled || isScanning || !uploadComplete}
+                disabled={!scanEnabled || isScanning || !uploadComplete || !medicalRecordArchiveId}
               >
                 扫描完成
               </Button>

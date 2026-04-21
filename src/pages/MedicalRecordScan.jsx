@@ -3,7 +3,7 @@ import { Layout, Checkbox, Button, Input, message, Modal, Row, Col, Space, Progr
 import { SearchOutlined, FolderOutlined, FileTextOutlined } from '@ant-design/icons';
 import './MedicalRecordScan.css';
 import * as UTIF from 'utif';
-import { getMedicalRecordMenu } from '../api/menuApi';
+import { getMedicalRecordMenu, saveScanMedRecordInfo } from '../api/menuApi';
 import PatientInfoBar from '../components/PatientInfoBar';
 import MenuSidebar from '../components/MenuSidebar';
 import DocumentGrid from '../components/DocumentGrid';
@@ -42,9 +42,10 @@ const convertBlobToImage = async (blobData, fileName, mimeType = 'image/jpeg') =
         const width = ifd.t256?.[0] || ifd.tifw || ifd.width;
         const height = ifd.t257?.[0] || ifd.tifh || ifd.height;
         if (!width || !height) throw new Error('无法获取TIF图片尺寸');
-        if (!ifd.t259) ifd.t259 = [1];
-        if (!ifd.t258) ifd.t258 = [8, 8, 8, 8];
-        if (!ifd.t277) ifd.t277 = [4];
+        UTIF.decodeImage(arrayBuffer, ifd);
+        // if (!ifd.t259) ifd.t259 = [1];
+        // if (!ifd.t258) ifd.t258 = [8, 8, 8, 8];
+        // if (!ifd.t277) ifd.t277 = [4];
         const rgba = UTIF.toRGBA8(ifd);
         const canvas = document.createElement('canvas');
         canvas.width = width;
@@ -91,7 +92,7 @@ function MedicalRecordScan() {
   const [draggedDocumentKey, setDraggedDocumentKey] = useState(null);
   const [selectedMenuKey, setSelectedMenuKey] = useState(null);
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
-  const [uploadComplete, setUploadComplete] = useState(true);
+  const [uploadComplete, setUploadComplete] = useState(false);
 
   useEffect(() => {
     const fetchMenuData = async () => {
@@ -199,7 +200,7 @@ function MedicalRecordScan() {
           return;
         }
         if (event.data instanceof Blob) {
-          receivedImages.push({ blob: event.data, fileName: `image-${receivedImages.length}.tiff` });
+          receivedImages.push({ blob: event.data, fileName: `image-${receivedImages.length}.tif` });
         }
       };
       ws.onclose = () => { closeReceived = true; clearTimeout(timeoutId); resolve(receivedImages); };
@@ -218,11 +219,12 @@ function MedicalRecordScan() {
     try {
       const params = {};
       const imagesData = await fetchImagesFromWebSocket(params);
+      console.log('获取到的图片数据', imagesData);
       if (imagesData.length === 0) { message.warning('未获取到扫描图片'); setIsScanning(false); return; }
       message.info('图片数据接收完成');
       for (let i = 0; i < imagesData.length; i++) {
         const imageData = imagesData[i];
-        const fileName = imageData.fileName || `image-${i}.tiff`;
+        const fileName = imageData.fileName || `image-${i}.tif`;
         const imageUrl = await convertBlobToImage(imageData.blob, fileName, 'image/tiff');
         if (!imageUrl) continue;
         setDocuments(prev => [...prev, { key: `ws-${i}-${Date.now()}`, order: prev.length + 1, image: imageUrl, fullImage: imageUrl, fileName, isSelected: false, isClassified: false }]);
@@ -439,17 +441,55 @@ function MedicalRecordScan() {
     } catch (error) {
       console.error('上传失败:', error);
       message.error(`上传失败: ${error.message}`);
-      setUploadComplete(true);
+      setUploadComplete(false);
     }
   };
 
   const handleScanComplete = () => {
+    if (!medicalRecordArchiveId) {
+      message.error("未获取到患者的medicalRecordArchiveId！");
+      return;
+    }
+    if (documents.length === 0) {
+      message.error("未获取到图像数据！");
+      return;
+    }
     Modal.confirm({
-      title: '确认扫描完成？',
+      title: '确认保存所有图像？',
       content: `您共有 ${documents.length} 页图片，确认提交？`,
       okText: '确认提交',
       cancelText: '取消',
-      onOk: () => message.success('扫描完成，数据已提交')
+      onOk: async () => {
+        try {
+          const params = {
+            medicalRecordArchiveId: medicalRecordArchiveId,
+            medScanRecordFileVOList: documents.map((doc) => ({
+              medicalRecordArchiveTpId: doc.menuTpId,
+              medicalRecordArchiveTpCode: doc.menuCode,
+              fileId: doc.fileId,
+              scanTypeCode: "1",
+              pageNumber: doc.pageNumber
+            })),
+            medicalRecordArchiveScanStatusCode: "1"
+          };
+          const response = await saveScanMedRecordInfo(params);
+          console.log('response', response);
+          if (response.success) {
+            setMedicalRecordArchiveId('');
+            setDocuments([]);
+            setSelectAll(false);
+            setSelectedMenuKey(null);
+            setSelectedMenu('overview');
+            setExpandedMenus(['discharge-related', 'progress-note']);
+            setPreviewImage('图像已保存');
+          } else {
+            throw new Error(result?.message || "保存失败");
+          }
+        } catch (error) {
+          console.warn('保存图像数据失败:', error.message);
+          message.error(`保存图像数据失败: ${error.message}`);
+        }
+      }
     });
   };
 
@@ -482,7 +522,7 @@ function MedicalRecordScan() {
         onScan={handleStartScan}
         onInsertPage={handleInsertPage}
         onRescan={handleRescan}
-        onUploadClick={() => setUploadModalVisible(true)}
+        onUploadClick={handleSaveTemp}
         onComplete={handleScanComplete}
         onDeleteSelected={handleDeleteSelected}
         onSelectAll={handleSelectAll}

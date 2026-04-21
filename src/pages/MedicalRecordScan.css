@@ -478,8 +478,8 @@
 /* 已绑定图片的菜单项样式 */
 .menu-item-bound {
   background-color: #e6f7ff;
-  border-left: 3px solid #1890ff;
-  padding-left: 8px !important;
+  /* border-left: 3px solid #1890ff;
+  padding-left: 8px !important; */
 }
 
 /* 菜单项拖拽悬停样式 */
