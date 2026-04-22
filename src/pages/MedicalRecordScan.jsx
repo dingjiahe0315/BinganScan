@@ -3,7 +3,7 @@ import { Layout, Checkbox, Button, Input, message, Modal, Row, Col, Space, Progr
 import { SearchOutlined, FolderOutlined, FileTextOutlined } from '@ant-design/icons';
 import './MedicalRecordScan.css';
 import * as UTIF from 'utif';
-import { getMedicalRecordMenu, saveScanMedRecordInfo } from '../api/menuApi';
+import { getMedicalRecordMenu, saveScanMedRecordInfo, getMedScanRecordFile } from '../api/menuApi';
 import PatientInfoBar from '../components/PatientInfoBar';
 import MenuSidebar from '../components/MenuSidebar';
 import DocumentGrid from '../components/DocumentGrid';
@@ -384,6 +384,7 @@ function MedicalRecordScan() {
   };
 
   const handleSaveTemp = () => {
+    console.log('documents', documents);
     if (documents.length === 0) {
       message.warning('没有可上传的图片');
       return;
@@ -415,9 +416,9 @@ function MedicalRecordScan() {
   };
 
   const handleUploadAll = async () => {
-    if (documents.length === 0) { message.warning('没有可上传的图片'); return; }
+    if (documents.filter((doc) => !doc.fileId).length === 0) { message.warning('没有可上传的图片'); return; }
     setUploadComplete(false);
-    let uploadedDocs = [...documents];
+    let uploadedDocs = [...documents.filter((doc) => !doc.fileId)];
     try {
       for (let i = 0; i < uploadedDocs.length; i++) {
         const doc = uploadedDocs[i];
@@ -434,10 +435,10 @@ function MedicalRecordScan() {
         }
       }
       console.log('上传后补充fileId信息', uploadedDocs);
-      setDocuments(uploadedDocs);
+      setDocuments(uploadedDocs.filter((doc) => doc.fileId).concat(uploadedDocs));
       setUploadModalVisible(false);
       setUploadComplete(true);
-      message.success(`成功上传 ${documents.length} 张图片`);
+      message.success(`成功上传 ${uploadedDocs.length} 张图片`);
     } catch (error) {
       console.error('上传失败:', error);
       message.error(`上传失败: ${error.message}`);
@@ -483,7 +484,7 @@ function MedicalRecordScan() {
             setExpandedMenus(['discharge-related', 'progress-note']);
             setPreviewImage('图像已保存');
           } else {
-            throw new Error(result?.message || "保存失败");
+            throw new Error(response?.message || "保存失败");
           }
         } catch (error) {
           console.warn('保存图像数据失败:', error.message);
@@ -491,6 +492,64 @@ function MedicalRecordScan() {
         }
       }
     });
+  };
+
+  const handleChangeMedical = async (medicalRecordArchiveId) => {
+    try {
+      const params = {
+        medicalRecordArchiveId: medicalRecordArchiveId,
+        visitType: '114',
+      };
+      const response = await getMedScanRecordFile(params);
+      if (response.success) {
+        console.log('response', response);
+        const files = response.data[0].medScanRecordFileVOList || [];
+        if (files.length === 0) { 
+          message.info('该病案暂无已保存的图像');
+          return; 
+        }
+        const loadedDocs = [];
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const fileId = file.fileId;
+          if (!fileId) continue;
+          try {
+            const imgResponse = await fetch(`/upload/${fileId}`);
+            const blob = await imgResponse.blob();
+            const dataUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            loadedDocs.push({
+              key: `load-${fileId}-${Date.now()}`,
+              fileName: file.fileName || `image-${i}.tif`,
+              image: dataUrl,
+              fullImage: dataUrl,
+              isSelected: false,
+              isClassified: false,
+              menuCode: file.menuCode,
+              menuTpId: file.menuTpId,
+              pageNumber: file.pageNumber || i + 1,
+              fileId: fileId,
+            });
+          } catch (err) {
+            console.error(`下载图像 ${fileId} 失败:`, err);
+          }
+        }
+        setDocuments(loadedDocs);
+        setUploadComplete(false);
+        setSelectedMenuKey(null);
+        setSelectedMenu('overview');
+        message.success(`成功加载 ${loadedDocs.length} 张图片`);
+      } else {
+        throw new Error(response.message || '加载失败');
+      }
+    } catch (error) {
+      console.error('加载图像失败:', error);
+      message.error(`加载图像失败: ${error.message}`);
+    }
   };
 
   const handleDeleteSelected = () => {
@@ -526,6 +585,7 @@ function MedicalRecordScan() {
         onComplete={handleScanComplete}
         onDeleteSelected={handleDeleteSelected}
         onSelectAll={handleSelectAll}
+        onChangeMedical={(medicalRecordArchiveId) => handleChangeMedical(medicalRecordArchiveId)}
         selectedCount={selectedCount}
         isScanning={isScanning}
         scanProgress={scanProgress}

@@ -13,6 +13,7 @@ function PatientInfoBar({
   onComplete,
   onDeleteSelected,
   onSelectAll,
+  onChangeMedical,
   selectedCount,
   isScanning,
   scanProgress,
@@ -100,9 +101,16 @@ function PatientInfoBar({
                 type="primary"
                 icon={<SaveOutlined />}
                 onClick={onComplete}
-                disabled={!scanEnabled || isScanning || !uploadComplete || !medicalRecordArchiveId}
+                disabled={!scanEnabled || isScanning || !uploadComplete}
               >
                 扫描完成
+              </Button>
+              <Button
+                type="primary"
+                onClick={onChangeMedical}
+                disabled={!scanEnabled || isScanning || !medicalRecordArchiveId}
+              >
+                重新加载
               </Button>
             </Space>
           </Col>
